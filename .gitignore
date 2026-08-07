@@ -1,0 +1,4 @@
+.build/
+SilentWhisper.app/
+AppIcon.icns
+*.zip

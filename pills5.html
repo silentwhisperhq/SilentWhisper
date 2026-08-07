@@ -1,0 +1,285 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Silent Whisper — mercury swarm & friends</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0 }
+body { min-height: 100vh; background: #06070b; color: #e6e9f0;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  padding: 52px 32px 90px; -webkit-font-smoothing: antialiased }
+header { max-width: 1160px; margin: 0 auto 40px }
+h1 { font-size: 22px; font-weight: 600; letter-spacing: -.02em }
+header p { color: #8b93a3; margin-top: 6px }
+.legend { display: flex; gap: 16px; margin-top: 14px; flex-wrap: wrap; font-size: 12px; color: #98a1b2 }
+.legend span { display: flex; align-items: center; gap: 7px }
+.legend i { width: 9px; height: 9px; border-radius: 50%; display: block }
+.grid { max-width: 1160px; margin: 0 auto; display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr)); gap: 20px }
+.card { background: #ffffff07; border: 1px solid #ffffff12; border-radius: 18px;
+  padding: 20px; display: flex; flex-direction: column; gap: 14px }
+.card.hero { grid-column: 1 / -1; background: #ffffff0c; border-color: #ffffff1c }
+.card.hero .stage { height: 210px }
+.card h2 { font-size: 13px; font-weight: 600 }
+.card .note { font-size: 12px; color: #7d8595; margin-top: -8px; min-height: 34px }
+.card.hero .note { min-height: 0 }
+.stage { position: relative; height: 165px; border-radius: 14px; overflow: hidden;
+  display: grid; place-items: center; cursor: pointer;
+  background: radial-gradient(60% 90% at 15% 20%, #ff5c7a3d, transparent 70%),
+              radial-gradient(50% 80% at 85% 75%, #3a7bff4d, transparent 70%),
+              linear-gradient(160deg, #171a24, #0b0d13) }
+.stage::after { content: ""; position: absolute; left: 0; right: 0; top: 64%; height: 44px;
+  background: repeating-linear-gradient(90deg, #ffffff10 0 34px, transparent 34px 52px) }
+.state-tag { font: 10px ui-monospace, monospace; letter-spacing: .09em; text-transform: uppercase;
+  color: #626b7c; text-align: center }
+
+/* ================= state language ================= */
+[data-state=idle] { --c1:#8a93a5; --c2:#5c6474; --lift:.26; --spd:1 }
+[data-state=rec]  { --c1:#00d8ff; --c2:#6a5cff; --lift:1;   --spd:1 }
+[data-state=think]{ --c1:#ffb03a; --c2:#ff4fa3; --lift:.9;  --spd:.34 }
+[data-state=done] { --c1:#3ce87a; --c2:#9fffc4; --lift:.75; --spd:1.6 }
+.stage { --amp: 0 }  /* live mic level, 0–1, written by JS */
+
+/* ================= the rig ================= */
+.rig { position: relative; width: 220px; height: 110px; z-index: 2 }
+.hero .rig { transform: scale(1.55) }
+.layer { position: absolute; inset: 0 }
+.layer b { position: absolute; left: 50%; top: 50%; display: block; border-radius: 50%;
+  transition: width .5s cubic-bezier(.2,.9,.3,1), height .5s cubic-bezier(.2,.9,.3,1),
+              margin .5s cubic-bezier(.2,.9,.3,1), opacity .4s }
+.aura { filter: blur(14px); opacity: calc(var(--lift) * (.55 + .45 * var(--amp)));
+  transform: scale(calc(1.14 + .14 * var(--amp))) }
+.aura b { background: var(--c1) }
+.aura b:nth-child(even) { background: var(--c2) }
+.body { filter: url(#goo); transform: scale(calc(1 + .07 * var(--amp))) }
+.body b { background: #08090e }
+
+/* core swells with the voice */
+.m { width: 20px; height: 20px; margin: -10px 0 0 -10px;
+  transform: scale(calc(.92 + .3 * var(--amp))) }
+[data-state=rec]   .m, [data-state=rec]   .shine { width: 44px; height: 44px; margin: -22px 0 0 -22px }
+[data-state=think] .m, [data-state=think] .shine { width: 36px; height: 36px; margin: -18px 0 0 -18px }
+[data-state=done]  .m, [data-state=done]  .shine { width: 30px; height: 30px; margin: -15px 0 0 -15px }
+
+/* gloss + seam, never gooed */
+.shine { position: absolute; left: 50%; top: 50%; pointer-events: none;
+  width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%;
+  transform: scale(calc(.92 + .3 * var(--amp)));
+  transition: width .5s cubic-bezier(.2,.9,.3,1), height .5s cubic-bezier(.2,.9,.3,1),
+              margin .5s cubic-bezier(.2,.9,.3,1) }
+.shine::before { content: ""; position: absolute; left: 6%; right: 6%; top: 50%; height: 3px;
+  transform: translateY(-50%) scaleX(calc(.55 + .5 * var(--amp)));
+  border-radius: 999px; filter: blur(2.4px); opacity: calc(var(--lift) * (.6 + .4 * var(--amp)));
+  background: linear-gradient(90deg, transparent, var(--c1) 20%, #fff 50%, var(--c2) 80%, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--c1) 80%, transparent) }
+.shine::after { content: ""; position: absolute; inset: 8% 18% 58%; border-radius: 50%;
+  background: linear-gradient(180deg, #ffffff3a, transparent) }
+
+.s { width: 0; height: 0; margin: 0 }
+
+/* ---------- fills ---------- */
+.chrome .body b { background: linear-gradient(158deg, #f2f7ff 0%, #a8b7cc 26%, #2c3341 58%, #dbe4f0 82%, #6f7d90 100%) }
+.chrome .shine::after { background: linear-gradient(180deg, #ffffff9e, transparent) }
+.pearl .body b { background: conic-gradient(from 200deg, #7cf6ff, #b28cff, #ff9ad5, #ffd88a, #8affc1, #7cf6ff) }
+.pearl .shine::after { background: linear-gradient(180deg, #ffffff7a, transparent) }
+.obsidian .body b { background: radial-gradient(circle at 34% 26%, #23262f, #05060a 70%) }
+
+/* ================= 1 ★ MERCURY SWARM ================= */
+[data-state=rec] .r1 .s, [data-state=think] .r1 .s, [data-state=done] .r1 .s { width: 14px; height: 14px }
+.r1 .s1 { margin: -22px 0 0 -40px; animation: swarm calc(2.4s * var(--spd)) ease-in-out infinite }
+.r1 .s2 { margin: 8px 0 0 -33px;   animation: swarm calc(3.1s * var(--spd)) ease-in-out infinite .3s }
+.r1 .s3 { margin: -27px 0 0 9px;   animation: swarm calc(2.7s * var(--spd)) ease-in-out infinite .6s }
+.r1 .s4 { margin: 10px 0 0 22px;   animation: swarm calc(3.6s * var(--spd)) ease-in-out infinite .9s }
+.r1 .s5 { margin: -9px 0 0 38px;   animation: swarm calc(2.9s * var(--spd)) ease-in-out infinite 1.2s }
+.r1 .s6 { margin: 2px 0 0 -52px;   animation: swarm calc(3.3s * var(--spd)) ease-in-out infinite 1.5s }
+@keyframes swarm {
+  0%,100% { transform: scale(calc(.35 + .5 * var(--amp))) translate(0,0) }
+  50%     { transform: scale(calc(.8 + .85 * var(--amp))) translate(-7px, 5px) }
+}
+
+/* ================= 2 · FERROFLUID — spikes ================= */
+.r2 .s { border-radius: 50%; transform-origin: 50% 50% }
+[data-state=rec] .r2 .s, [data-state=think] .r2 .s, [data-state=done] .r2 .s
+  { width: 11px; height: 11px; margin: -5px 0 0 -5px }
+.r2 .s1 { transform: rotate(  0deg) translateY(calc(-16px - 26px * var(--amp))) scaleY(calc(1 + 2.6 * var(--amp))) }
+.r2 .s2 { transform: rotate( 51deg) translateY(calc(-15px - 22px * var(--amp))) scaleY(calc(1 + 2.2 * var(--amp))) }
+.r2 .s3 { transform: rotate(103deg) translateY(calc(-16px - 28px * var(--amp))) scaleY(calc(1 + 2.8 * var(--amp))) }
+.r2 .s4 { transform: rotate(154deg) translateY(calc(-14px - 20px * var(--amp))) scaleY(calc(1 + 2.0 * var(--amp))) }
+.r2 .s5 { transform: rotate(206deg) translateY(calc(-16px - 25px * var(--amp))) scaleY(calc(1 + 2.5 * var(--amp))) }
+.r2 .s6 { transform: rotate(257deg) translateY(calc(-15px - 23px * var(--amp))) scaleY(calc(1 + 2.3 * var(--amp))) }
+.r2 .s7 { transform: rotate(309deg) translateY(calc(-16px - 27px * var(--amp))) scaleY(calc(1 + 2.7 * var(--amp))) }
+
+/* ================= 3 · COMET — trailing tail ================= */
+[data-state=rec] .r3 .s, [data-state=think] .r3 .s, [data-state=done] .r3 .s { border-radius: 50% }
+.r3 .s1 { width: 16px; height: 16px; margin: -8px 0 0 -8px; animation: flow calc(2.6s * var(--spd)) linear infinite }
+.r3 .s2 { width: 13px; height: 13px; margin: -6px 0 0 -6px; animation: flow calc(2.6s * var(--spd)) linear infinite .28s }
+.r3 .s3 { width: 10px; height: 10px; margin: -5px 0 0 -5px; animation: flow calc(2.6s * var(--spd)) linear infinite .56s }
+.r3 .s4 { width: 8px;  height: 8px;  margin: -4px 0 0 -4px; animation: flow calc(2.6s * var(--spd)) linear infinite .84s }
+.r3 .s5 { width: 6px;  height: 6px;  margin: -3px 0 0 -3px; animation: flow calc(2.6s * var(--spd)) linear infinite 1.12s }
+[data-state=idle] .r3 .s { animation: none }
+@keyframes flow {
+  0%   { transform: translate(-6px, 0) scale(.2); opacity: 0 }
+  22%  { opacity: 1 }
+  100% { transform: translate(calc(46px + 26px * var(--amp)), -6px) scale(.25); opacity: 0 }
+}
+
+/* ================= 4 · PEARL SWARM — oil-slick ================= */
+[data-state=rec] .r4 .s, [data-state=think] .r4 .s, [data-state=done] .r4 .s { width: 15px; height: 15px }
+.r4 .s1 { margin: -19px 0 0 -37px; animation: swarm calc(3.4s * var(--spd)) ease-in-out infinite }
+.r4 .s2 { margin: 11px 0 0 -26px;  animation: swarm calc(2.8s * var(--spd)) ease-in-out infinite .4s }
+.r4 .s3 { margin: -24px 0 0 16px;  animation: swarm calc(3.9s * var(--spd)) ease-in-out infinite .8s }
+.r4 .s4 { margin: 9px 0 0 31px;    animation: swarm calc(3.1s * var(--spd)) ease-in-out infinite 1.2s }
+.r4 .s5 { margin: -4px 0 0 46px;   animation: swarm calc(2.6s * var(--spd)) ease-in-out infinite 1.6s }
+
+/* ================= 5 · TIDE — current sweeping through ================= */
+[data-state=rec] .r5 .s, [data-state=think] .r5 .s, [data-state=done] .r5 .s { width: 14px; height: 14px }
+.r5 .s1 { margin: -14px 0 0 -7px; animation: tide calc(3.2s * var(--spd)) ease-in-out infinite }
+.r5 .s2 { margin: 2px 0 0 -7px;   animation: tide calc(3.2s * var(--spd)) ease-in-out infinite .5s }
+.r5 .s3 { margin: -22px 0 0 -7px; animation: tide calc(3.2s * var(--spd)) ease-in-out infinite 1s }
+.r5 .s4 { margin: 12px 0 0 -7px;  animation: tide calc(3.2s * var(--spd)) ease-in-out infinite 1.5s }
+.r5 .s5 { margin: -6px 0 0 -7px;  animation: tide calc(3.2s * var(--spd)) ease-in-out infinite 2s }
+[data-state=idle] .r5 .s { animation: none }
+@keyframes tide {
+  0%   { transform: translateX(calc(-42px - 18px * var(--amp))) scale(.3); opacity: 0 }
+  25%,75% { opacity: 1 }
+  50%  { transform: translateX(0) scale(calc(.7 + .6 * var(--amp))) }
+  100% { transform: translateX(calc(42px + 18px * var(--amp))) scale(.3); opacity: 0 }
+}
+
+/* ================= 6 · OBSIDIAN SWARM — the dark twin ================= */
+[data-state=rec] .r6 .s, [data-state=think] .r6 .s, [data-state=done] .r6 .s { width: 14px; height: 14px }
+.r6 .s1 { margin: -21px 0 0 -39px; animation: swarm calc(2.5s * var(--spd)) ease-in-out infinite }
+.r6 .s2 { margin: 9px 0 0 -31px;   animation: swarm calc(3.2s * var(--spd)) ease-in-out infinite .35s }
+.r6 .s3 { margin: -26px 0 0 11px;  animation: swarm calc(2.8s * var(--spd)) ease-in-out infinite .7s }
+.r6 .s4 { margin: 11px 0 0 24px;   animation: swarm calc(3.7s * var(--spd)) ease-in-out infinite 1.05s }
+.r6 .s5 { margin: -8px 0 0 40px;   animation: swarm calc(3s * var(--spd))   ease-in-out infinite 1.4s }
+</style>
+
+<header>
+  <h1>Silent Whisper — mercury swarm &amp; friends</h1>
+  <p>Every blob here is driven by a simulated mic level, not a fixed loop — the core swells, satellites throw further, the seam brightens. Click a tile to cycle states.</p>
+  <div class="legend">
+    <span><i style="background:#8a93a5"></i> idle</span>
+    <span><i style="background:linear-gradient(90deg,#00d8ff,#6a5cff)"></i> recording</span>
+    <span><i style="background:linear-gradient(90deg,#ffb03a,#ff4fa3)"></i> transcribing</span>
+    <span><i style="background:#3ce87a"></i> pasted</span>
+  </div>
+</header>
+
+<svg width="0" height="0" style="position:absolute">
+  <filter id="goo">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="b"/>
+    <feColorMatrix in="b" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 26 -12"/>
+  </filter>
+</svg>
+
+<div class="grid">
+
+  <div class="card hero">
+    <h2>★ Mercury Swarm</h2>
+    <p class="note">Liquid chrome core, six satellites breathing in and out of it, each scaling with your voice. Iridescent seam across the middle.</p>
+    <div class="stage" data-state="idle">
+      <div class="rig r1 chrome">
+        <div class="layer aura"><b class="m"></b><b class="s s1"></b><b class="s s2"></b><b class="s s3"></b><b class="s s4"></b><b class="s s5"></b><b class="s s6"></b></div>
+        <div class="layer body"><b class="m"></b><b class="s s1"></b><b class="s s2"></b><b class="s s3"></b><b class="s s4"></b><b class="s s5"></b><b class="s s6"></b></div>
+        <div class="shine"></div>
+      </div>
+    </div>
+    <div class="state-tag"></div>
+  </div>
+
+  <div class="card">
+    <h2>2 · Ferrofluid</h2>
+    <p class="note">Seven spikes pulled out of the core by the sound. Loud = long spikes. Pure magnet-and-oil.</p>
+    <div class="stage" data-state="idle">
+      <div class="rig r2 chrome">
+        <div class="layer aura"><b class="m"></b><b class="s s1"></b><b class="s s2"></b><b class="s s3"></b><b class="s s4"></b><b class="s s5"></b><b class="s s6"></b><b class="s s7"></b></div>
+        <div class="layer body"><b class="m"></b><b class="s s1"></b><b class="s s2"></b><b class="s s3"></b><b class="s s4"></b><b class="s s5"></b><b class="s s6"></b><b class="s s7"></b></div>
+        <div class="shine"></div>
+      </div>
+    </div>
+    <div class="state-tag"></div>
+  </div>
+
+  <div class="card">
+    <h2>3 · Comet</h2>
+    <p class="note">Droplets shed off the core and stream away, shrinking. Directional — reads as "flowing out to your cursor".</p>
+    <div class="stage" data-state="idle">
+      <div class="rig r3 chrome">
+        <div class="layer aura"><b class="m"></b><b class="s s1"></b><b class="s s2"></b><b class="s s3"></b><b class="s s4"></b><b class="s s5"></b></div>
+        <div class="layer body"><b class="m"></b><b class="s s1"></b><b class="s s2"></b><b class="s s3"></b><b class="s s4"></b><b class="s s5"></b></div>
+        <div class="shine"></div>
+      </div>
+    </div>
+    <div class="state-tag"></div>
+  </div>
+
+  <div class="card">
+    <h2>4 · Pearl Swarm</h2>
+    <p class="note">Same swarm, oil-slick fill — soap-bubble iridescence instead of chrome. Softer, dreamier.</p>
+    <div class="stage" data-state="idle">
+      <div class="rig r4 pearl">
+        <div class="layer aura"><b class="m"></b><b class="s s1"></b><b class="s s2"></b><b class="s s3"></b><b class="s s4"></b><b class="s s5"></b></div>
+        <div class="layer body"><b class="m"></b><b class="s s1"></b><b class="s s2"></b><b class="s s3"></b><b class="s s4"></b><b class="s s5"></b></div>
+        <div class="shine"></div>
+      </div>
+    </div>
+    <div class="state-tag"></div>
+  </div>
+
+  <div class="card">
+    <h2>5 · Tide</h2>
+    <p class="note">Droplets sweep left-to-right through the core like a current. Continuous, hypnotic.</p>
+    <div class="stage" data-state="idle">
+      <div class="rig r5 chrome">
+        <div class="layer aura"><b class="m"></b><b class="s s1"></b><b class="s s2"></b><b class="s s3"></b><b class="s s4"></b><b class="s s5"></b></div>
+        <div class="layer body"><b class="m"></b><b class="s s1"></b><b class="s s2"></b><b class="s s3"></b><b class="s s4"></b><b class="s s5"></b></div>
+        <div class="shine"></div>
+      </div>
+    </div>
+    <div class="state-tag"></div>
+  </div>
+
+  <div class="card">
+    <h2>6 · Obsidian Swarm</h2>
+    <p class="note">The dark twin of the hero — black glass instead of chrome, so the colour only shows in the halo and seam.</p>
+    <div class="stage" data-state="idle">
+      <div class="rig r6 obsidian">
+        <div class="layer aura"><b class="m"></b><b class="s s1"></b><b class="s s2"></b><b class="s s3"></b><b class="s s4"></b><b class="s s5"></b></div>
+        <div class="layer body"><b class="m"></b><b class="s s1"></b><b class="s s2"></b><b class="s s3"></b><b class="s s4"></b><b class="s s5"></b></div>
+        <div class="shine"></div>
+      </div>
+    </div>
+    <div class="state-tag"></div>
+  </div>
+
+</div>
+
+<script>
+const STATES = ["idle", "rec", "think", "done"];
+const TAG = { idle: "idle", rec: "recording", think: "transcribing", done: "pasted" };
+const stages = [...document.querySelectorAll(".stage")];
+
+stages.forEach(stage => {
+  const tag = stage.parentElement.querySelector(".state-tag");
+  const apply = s => { stage.dataset.state = s; tag.textContent = TAG[s] };
+  apply("idle");
+  stage.onclick = () => apply(STATES[(STATES.indexOf(stage.dataset.state) + 1) % 4]);
+  stage._amp = 0; stage._t = Math.random() * 100;
+});
+
+// fake mic level: smoothed noise, so the blobs move like speech rather than a metronome
+// ponytail: two sines + a jitter beats a real envelope follower for a mockup
+(function tick() {
+  for (const s of stages) {
+    s._t += 0.055;
+    const st = s.dataset.state;
+    const target =
+      st === "rec"   ? Math.max(0, 0.45 + 0.4 * Math.sin(s._t) + 0.28 * Math.sin(s._t * 2.7 + 1) + (Math.random() - .5) * .18)
+    : st === "think" ? 0.3 + 0.25 * Math.sin(s._t * 3.4)
+    : st === "done"  ? 0.2
+    :                  0.1 + 0.08 * Math.sin(s._t * 0.4);
+    s._amp += (Math.min(1, Math.max(0, target)) - s._amp) * 0.18;
+    s.style.setProperty("--amp", s._amp.toFixed(3));
+  }
+  requestAnimationFrame(tick);
+})();
+</script>

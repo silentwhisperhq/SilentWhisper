@@ -1,0 +1,228 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Silent Whisper — droplets</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0 }
+body { min-height: 100vh; background: #06070b; color: #e6e9f0;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  padding: 52px 32px 90px; -webkit-font-smoothing: antialiased }
+header { max-width: 1120px; margin: 0 auto 40px }
+h1 { font-size: 22px; font-weight: 600; letter-spacing: -.02em }
+header p { color: #8b93a3; margin-top: 6px }
+.legend { display: flex; gap: 16px; margin-top: 14px; flex-wrap: wrap; font-size: 12px; color: #98a1b2 }
+.legend span { display: flex; align-items: center; gap: 7px }
+.legend i { width: 9px; height: 9px; border-radius: 50%; display: block }
+.grid { max-width: 1120px; margin: 0 auto; display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(330px, 1fr)); gap: 20px }
+.card { background: #ffffff07; border: 1px solid #ffffff12; border-radius: 18px;
+        padding: 20px; display: flex; flex-direction: column; gap: 14px }
+.card.hero { grid-column: 1 / -1; background: #ffffff0c; border-color: #ffffff1c }
+.card.hero .stage { height: 200px }
+.card h2 { font-size: 13px; font-weight: 600 }
+.card .note { font-size: 12px; color: #7d8595; margin-top: -8px; min-height: 34px }
+.card.hero .note { min-height: 0 }
+.stage { position: relative; height: 160px; border-radius: 14px; overflow: hidden;
+  display: grid; place-items: center; cursor: pointer;
+  background: radial-gradient(60% 90% at 15% 20%, #ff5c7a3d, transparent 70%),
+              radial-gradient(50% 80% at 85% 75%, #3a7bff4d, transparent 70%),
+              linear-gradient(160deg, #171a24, #0b0d13) }
+.stage::after { content: ""; position: absolute; left: 0; right: 0; top: 62%; height: 44px;
+  background: repeating-linear-gradient(90deg, #ffffff10 0 34px, transparent 34px 52px) }
+.state-tag { font: 10px ui-monospace, monospace; letter-spacing: .09em; text-transform: uppercase;
+  color: #626b7c; text-align: center }
+
+/* ================= shared state language ================= */
+[data-state=idle] { --c1:#8a93a5; --c2:#5c6474; --lift:.28; --spd:1 }
+[data-state=rec]  { --c1:#00d8ff; --c2:#6a5cff; --lift:1;   --spd:1 }
+[data-state=think]{ --c1:#ffb03a; --c2:#ff4fa3; --lift:.9;  --spd:.34 }
+[data-state=done] { --c1:#3ce87a; --c2:#9fffc4; --lift:.75; --spd:1.6 }
+
+/* ================= droplet rig =================
+   three stacked layers, identical blob geometry:
+   .aura  colour halo (blurred)   .body  gooed silhouette   .shine  gloss + seam  */
+.rig { position: relative; width: 200px; height: 96px; z-index: 2 }
+.hero .rig { transform: scale(1.5) }
+.layer { position: absolute; inset: 0 }
+.layer b { position: absolute; left: 50%; top: 50%; display: block; border-radius: 50%;
+  transition: width .5s cubic-bezier(.2,.9,.3,1), height .5s cubic-bezier(.2,.9,.3,1),
+              margin .5s cubic-bezier(.2,.9,.3,1), opacity .4s }
+.aura { filter: blur(13px); opacity: var(--lift); transform: scale(1.18); transition: opacity .4s }
+.aura b { background: var(--c1) }
+.aura b:nth-child(even) { background: var(--c2) }
+.body { filter: url(#goo) }
+.body b { background: #08090e;
+  box-shadow: inset 0 2px 0 #ffffff1a }
+
+/* gloss + iridescent seam, riding on the core only (never gooed) */
+.shine { position: absolute; left: 50%; top: 50%; pointer-events: none;
+  width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%;
+  transition: width .5s cubic-bezier(.2,.9,.3,1), height .5s cubic-bezier(.2,.9,.3,1),
+              margin .5s cubic-bezier(.2,.9,.3,1) }
+.shine::before { content: ""; position: absolute; left: 8%; right: 8%; top: 50%; height: 3px;
+  transform: translateY(-50%); border-radius: 999px; filter: blur(2.4px); opacity: var(--lift);
+  background: linear-gradient(90deg, transparent, var(--c1) 20%, #fff 50%, var(--c2) 80%, transparent);
+  box-shadow: 0 0 16px color-mix(in srgb, var(--c1) 75%, transparent);
+  animation: seam calc(2.6s * var(--spd)) ease-in-out infinite; transition: opacity .4s }
+@keyframes seam { 50% { transform: translateY(-50%) scaleX(.7); filter: blur(4.5px) } }
+.shine::after { content: ""; position: absolute; inset: 8% 18% 58%; border-radius: 50%;
+  background: linear-gradient(180deg, #ffffff3a, transparent) }
+
+/* core sizing, shared by .m blobs and .shine */
+.m, .shine { width: 20px; height: 20px; margin: -10px 0 0 -10px }
+[data-state=rec]   .m, [data-state=rec]   .shine { width: 42px; height: 42px; margin: -21px 0 0 -21px }
+[data-state=think] .m, [data-state=think] .shine { width: 34px; height: 34px; margin: -17px 0 0 -17px }
+[data-state=done]  .m, [data-state=done]  .shine { width: 30px; height: 30px; margin: -15px 0 0 -15px }
+[data-state=idle] .aura { transform: scale(1) }
+
+/* satellites collapse into the core when idle */
+.s { width: 0; height: 0; margin: 0 }
+
+/* ---- 1 · PRISM DROPLET — two satellites swimming sideways ---- */
+[data-state=rec] .r1 .s1, [data-state=think] .r1 .s1, [data-state=done] .r1 .s1
+  { width: 20px; height: 20px; margin: -10px 0 0 -44px; animation: swimL calc(3.2s * var(--spd)) ease-in-out infinite }
+[data-state=rec] .r1 .s2, [data-state=think] .r1 .s2, [data-state=done] .r1 .s2
+  { width: 15px; height: 15px; margin: -7px 0 0 27px;  animation: swimR calc(4s * var(--spd)) ease-in-out infinite }
+@keyframes swimL { 50% { transform: translate(-16px, 6px) scale(1.15) } }
+@keyframes swimR { 50% { transform: translate(20px, -7px) scale(.78) } }
+
+/* ---- 2 · MERCURY — chrome fill, tight orbit ---- */
+.r2 .body b { background: linear-gradient(160deg, #e8eef6 0%, #98a6bb 28%, #2b3240 62%, #cfd9e6 100%) }
+.r2 .shine::after { background: linear-gradient(180deg, #ffffff88, transparent) }
+[data-state=rec] .r2 .s1, [data-state=think] .r2 .s1, [data-state=done] .r2 .s1
+  { width: 17px; height: 17px; margin: -8px 0 0 -34px; animation: orbit calc(4.5s * var(--spd)) linear infinite }
+[data-state=rec] .r2 .s2, [data-state=think] .r2 .s2, [data-state=done] .r2 .s2
+  { width: 13px; height: 13px; margin: -6px 0 0 22px;  animation: orbit calc(3.2s * var(--spd)) linear infinite reverse }
+@keyframes orbit { to { transform: rotate(1turn) translateX(6px) rotate(-1turn) } }
+
+/* ---- 3 · INK — droplets rise and fall back, lava-lamp ---- */
+[data-state=rec] .r3 .s1, [data-state=think] .r3 .s1, [data-state=done] .r3 .s1
+  { width: 14px; height: 14px; margin: -7px 0 0 -22px; animation: rise calc(3.4s * var(--spd)) ease-in-out infinite }
+[data-state=rec] .r3 .s2, [data-state=think] .r3 .s2, [data-state=done] .r3 .s2
+  { width: 11px; height: 11px; margin: -5px 0 0 14px;  animation: rise calc(4.2s * var(--spd)) ease-in-out infinite .7s }
+[data-state=rec] .r3 .s3, [data-state=think] .r3 .s3, [data-state=done] .r3 .s3
+  { width: 9px;  height: 9px;  margin: -4px 0 0 -4px;  animation: rise calc(2.9s * var(--spd)) ease-in-out infinite 1.4s }
+@keyframes rise { 0%,100% { transform: translateY(4px) scale(.7) } 50% { transform: translateY(-24px) scale(1.1) } }
+
+/* ---- 4 · SWARM — five satellites, level-reactive feel ---- */
+.r4 .s { animation-timing-function: ease-in-out }
+[data-state=rec] .r4 .s, [data-state=think] .r4 .s, [data-state=done] .r4 .s { width: 13px; height: 13px }
+[data-state=rec] .r4 .s1, [data-state=think] .r4 .s1, [data-state=done] .r4 .s1
+  { margin: -20px 0 0 -36px; animation: pulse calc(2.4s * var(--spd)) infinite }
+[data-state=rec] .r4 .s2, [data-state=think] .r4 .s2, [data-state=done] .r4 .s2
+  { margin: 6px 0 0 -30px;  animation: pulse calc(3.1s * var(--spd)) infinite .3s }
+[data-state=rec] .r4 .s3, [data-state=think] .r4 .s3, [data-state=done] .r4 .s3
+  { margin: -24px 0 0 8px;  animation: pulse calc(2.7s * var(--spd)) infinite .6s }
+[data-state=rec] .r4 .s4, [data-state=think] .r4 .s4, [data-state=done] .r4 .s4
+  { margin: 8px 0 0 20px;   animation: pulse calc(3.6s * var(--spd)) infinite .9s }
+[data-state=rec] .r4 .s5, [data-state=think] .r4 .s5, [data-state=done] .r4 .s5
+  { margin: -8px 0 0 34px;  animation: pulse calc(2.9s * var(--spd)) infinite 1.2s }
+@keyframes pulse { 0%,100% { transform: scale(.5) translate(0,0) } 50% { transform: scale(1.35) translate(-6px,4px) } }
+
+/* ---- 5 · SPLIT — core divides into two lobes, neck stretches ---- */
+.r5 .shine::before { animation: seamSplit calc(3.6s * var(--spd)) ease-in-out infinite }
+@keyframes seamSplit { 0%,100% { transform: translateY(-50%) scaleX(.55) } 50% { transform: translateY(-50%) scaleX(1.9); filter: blur(1.5px) } }
+[data-state=rec] .r5 .s1, [data-state=think] .r5 .s1, [data-state=done] .r5 .s1
+  { width: 34px; height: 34px; margin: -17px 0 0 -17px; animation: splitL calc(3.6s * var(--spd)) ease-in-out infinite }
+[data-state=rec] .r5 .s2, [data-state=think] .r5 .s2, [data-state=done] .r5 .s2
+  { width: 28px; height: 28px; margin: -14px 0 0 -14px; animation: splitR calc(3.6s * var(--spd)) ease-in-out infinite }
+@keyframes splitL { 0%,100% { transform: translateX(0) } 50% { transform: translateX(-30px) scale(.9) } }
+@keyframes splitR { 0%,100% { transform: translateX(0) } 50% { transform: translateX(28px) scale(.85) } }
+</style>
+
+<header>
+  <h1>Silent Whisper — droplet studies</h1>
+  <p>Prism × Droplet up top, then four ways the liquid can behave. Click any tile to cycle states.</p>
+  <div class="legend">
+    <span><i style="background:#8a93a5"></i> idle — grey, satellites absorbed</span>
+    <span><i style="background:linear-gradient(90deg,#00d8ff,#6a5cff)"></i> recording — cyan→violet</span>
+    <span><i style="background:linear-gradient(90deg,#ffb03a,#ff4fa3)"></i> transcribing — amber→pink, 3× speed</span>
+    <span><i style="background:#3ce87a"></i> pasted — green, settling</span>
+  </div>
+</header>
+
+<svg width="0" height="0" style="position:absolute">
+  <filter id="goo">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="b"/>
+    <feColorMatrix in="b" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 26 -12"/>
+  </filter>
+</svg>
+
+<div class="grid">
+
+  <div class="card hero">
+    <h2>★ Prism Droplet — the mix</h2>
+    <p class="note">Glossy black metaball core with the iridescent seam burning through it; satellites peel off and merge back. Colour halo bleeds through the goo.</p>
+    <div class="stage" data-state="idle">
+      <div class="rig r1">
+        <div class="layer aura"><b class="m"></b><b class="s s1"></b><b class="s s2"></b></div>
+        <div class="layer body"><b class="m"></b><b class="s s1"></b><b class="s s2"></b></div>
+        <div class="shine"></div>
+      </div>
+    </div>
+    <div class="state-tag"></div>
+  </div>
+
+  <div class="card">
+    <h2>2 · Mercury</h2>
+    <p class="note">Same rig, liquid-chrome fill. Satellites orbit tight instead of swimming.</p>
+    <div class="stage" data-state="idle">
+      <div class="rig r2">
+        <div class="layer aura"><b class="m"></b><b class="s s1"></b><b class="s s2"></b></div>
+        <div class="layer body"><b class="m"></b><b class="s s1"></b><b class="s s2"></b></div>
+        <div class="shine"></div>
+      </div>
+    </div>
+    <div class="state-tag"></div>
+  </div>
+
+  <div class="card">
+    <h2>3 · Ink</h2>
+    <p class="note">Droplets rise off the core and sink back. Lava-lamp cadence, very calm.</p>
+    <div class="stage" data-state="idle">
+      <div class="rig r3">
+        <div class="layer aura"><b class="m"></b><b class="s s1"></b><b class="s s2"></b><b class="s s3"></b></div>
+        <div class="layer body"><b class="m"></b><b class="s s1"></b><b class="s s2"></b><b class="s s3"></b></div>
+        <div class="shine"></div>
+      </div>
+    </div>
+    <div class="state-tag"></div>
+  </div>
+
+  <div class="card">
+    <h2>4 · Swarm</h2>
+    <p class="note">Five satellites breathing in and out of the core — the obvious hook for live mic level.</p>
+    <div class="stage" data-state="idle">
+      <div class="rig r4">
+        <div class="layer aura"><b class="m"></b><b class="s s1"></b><b class="s s2"></b><b class="s s3"></b><b class="s s4"></b><b class="s s5"></b></div>
+        <div class="layer body"><b class="m"></b><b class="s s1"></b><b class="s s2"></b><b class="s s3"></b><b class="s s4"></b><b class="s s5"></b></div>
+        <div class="shine"></div>
+      </div>
+    </div>
+    <div class="state-tag"></div>
+  </div>
+
+  <div class="card">
+    <h2>5 · Split</h2>
+    <p class="note">Core divides into two lobes and rejoins; the goo neck stretches between them, seam stretching with it.</p>
+    <div class="stage" data-state="idle">
+      <div class="rig r5">
+        <div class="layer aura"><b class="s s1"></b><b class="s s2"></b></div>
+        <div class="layer body"><b class="s s1"></b><b class="s s2"></b></div>
+        <div class="shine"></div>
+      </div>
+    </div>
+    <div class="state-tag"></div>
+  </div>
+
+</div>
+
+<script>
+const STATES = ["idle", "rec", "think", "done"];
+const TAG = { idle: "idle", rec: "recording", think: "transcribing", done: "pasted" };
+document.querySelectorAll(".stage").forEach(stage => {
+  const tag = stage.parentElement.querySelector(".state-tag");
+  const apply = s => { stage.dataset.state = s; tag.textContent = TAG[s] };
+  apply("idle");
+  stage.onclick = () => apply(STATES[(STATES.indexOf(stage.dataset.state) + 1) % 4]);
+});
+</script>

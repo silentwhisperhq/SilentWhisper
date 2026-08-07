@@ -1,0 +1,224 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Silent Whisper — liquid glass</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0 }
+body {
+  min-height: 100vh; background: #06070b; color: #e6e9f0;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+  padding: 52px 32px 90px; -webkit-font-smoothing: antialiased;
+}
+header { max-width: 1120px; margin: 0 auto 40px }
+h1 { font-size: 22px; font-weight: 600; letter-spacing: -.02em }
+header p { color: #8b93a3; margin-top: 6px }
+.legend { display: flex; gap: 16px; margin-top: 14px; flex-wrap: wrap; font-size: 12px; color: #98a1b2 }
+.legend span { display: flex; align-items: center; gap: 7px }
+.legend i { width: 9px; height: 9px; border-radius: 50%; display: block }
+
+.grid { max-width: 1120px; margin: 0 auto; display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); gap: 20px }
+.card { background: #ffffff07; border: 1px solid #ffffff12; border-radius: 18px;
+        padding: 20px; display: flex; flex-direction: column; gap: 14px }
+.card h2 { font-size: 13px; font-weight: 600 }
+.card .note { font-size: 12px; color: #7d8595; margin-top: -8px; min-height: 34px }
+
+/* mock desktop so the glass has something to refract */
+.stage {
+  position: relative; height: 150px; border-radius: 14px; overflow: hidden;
+  display: grid; place-items: center; cursor: pointer;
+  background:
+    radial-gradient(60% 90% at 15% 20%, #ff5c7a44, transparent 70%),
+    radial-gradient(50% 80% at 85% 75%, #3a7bff55, transparent 70%),
+    linear-gradient(160deg, #171a24, #0b0d13);
+}
+.stage::after { /* fake content behind the glass */
+  content: ""; position: absolute; left: 0; right: 0; top: 58%; height: 46px;
+  background: repeating-linear-gradient(90deg, #ffffff10 0 34px, transparent 34px 52px);
+}
+.state-tag { font: 10px ui-monospace, monospace; letter-spacing: .09em; text-transform: uppercase;
+             color: #626b7c; text-align: center }
+
+/* ---------- shared state colour language ---------- */
+.o { position: relative; z-index: 2; transition:
+     width .5s cubic-bezier(.2,.9,.3,1), height .5s cubic-bezier(.2,.9,.3,1),
+     opacity .4s, filter .4s, box-shadow .5s, transform .5s cubic-bezier(.2,.9,.3,1) }
+[data-state=idle] { --c1:#8a93a5; --c2:#5c6474; --lift: .30 }
+[data-state=rec]  { --c1:#00d8ff; --c2:#6a5cff; --lift: 1 }
+[data-state=think]{ --c1:#ffb03a; --c2:#ff4fa3; --lift: .85 }
+[data-state=done] { --c1:#3ce87a; --c2:#9fffc4; --lift: .7 }
+
+@keyframes morph {
+  0%,100% { border-radius: 52% 48% 46% 54% / 58% 42% 58% 42% }
+  33%     { border-radius: 44% 56% 58% 42% / 46% 60% 40% 54% }
+  66%     { border-radius: 58% 42% 44% 56% / 52% 44% 56% 48% }
+}
+@keyframes drift { to { transform: rotate(1turn) } }
+@keyframes breathe { 50% { transform: scale(1.06) } }
+
+/* ================= 1 · PRISM — glossy black bead, light seam inside ================= */
+.d1 { width: 30px; height: 16px; background: #08090d;
+  box-shadow: 0 8px 26px #000b, inset 0 1px 0 #ffffff26, inset 0 -6px 14px #ffffff08;
+  backdrop-filter: blur(6px) saturate(140%);
+  animation: morph 9s ease-in-out infinite;
+  border-radius: 52% 48% 46% 54% / 58% 42% 58% 42%;
+}
+[data-state=rec]   .d1 { width: 96px; height: 42px }
+[data-state=think] .d1 { width: 78px; height: 38px }
+[data-state=done]  .d1 { width: 64px; height: 32px }
+.d1::before { /* the iridescent seam */
+  content: ""; position: absolute; left: 12%; right: 12%; top: 50%; height: 3px;
+  transform: translateY(-50%); border-radius: 999px; filter: blur(2.5px);
+  background: linear-gradient(90deg, transparent, var(--c1) 22%, #fff 50%, var(--c2) 78%, transparent);
+  opacity: var(--lift);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--c1) 70%, transparent);
+  transition: opacity .4s, background .4s, box-shadow .4s;
+  animation: seam 2.6s ease-in-out infinite;
+}
+@keyframes seam { 50% { transform: translateY(-50%) scaleX(.72); filter: blur(4px) } }
+[data-state=think] .d1::before { animation-duration: 1s }
+.d1::after { /* top gloss */
+  content: ""; position: absolute; inset: 6% 14% 55%; border-radius: 50%;
+  background: linear-gradient(180deg, #ffffff2e, transparent);
+}
+
+/* ================= 2 · DROPLET — metaball goo ================= */
+.d2 { width: 100px; height: 60px; filter: url(#goo) blur(.2px) }
+.d2 b { position: absolute; border-radius: 50%; display: block;
+  background: radial-gradient(circle at 35% 30%, var(--c1), var(--c2) 70%);
+  transition: all .5s cubic-bezier(.2,.9,.3,1) }
+.d2 .m { left: 50%; top: 50%; width: 20px; height: 20px; margin: -10px 0 0 -10px;
+  animation: breathe 3.4s ease-in-out infinite }
+.d2 .s1 { left: 50%; top: 50%; width: 0; height: 0; margin: 0 }
+.d2 .s2 { left: 50%; top: 50%; width: 0; height: 0; margin: 0 }
+[data-state=idle] .d2 { opacity: .45 }
+[data-state=rec] .d2 .m, [data-state=think] .d2 .m, [data-state=done] .d2 .m
+  { width: 34px; height: 34px; margin: -17px 0 0 -17px }
+[data-state=rec] .d2 .s1, [data-state=think] .d2 .s1
+  { width: 18px; height: 18px; margin: -9px 0 0 -32px; animation: orbA 3s ease-in-out infinite }
+[data-state=rec] .d2 .s2, [data-state=think] .d2 .s2
+  { width: 14px; height: 14px; margin: -7px 0 0 18px; animation: orbB 3.8s ease-in-out infinite }
+[data-state=think] .d2 .s1, [data-state=think] .d2 .s2 { animation-duration: 1.2s }
+@keyframes orbA { 50% { transform: translate(-9px, 7px) scale(1.2) } }
+@keyframes orbB { 50% { transform: translate(11px, -8px) scale(.8) } }
+
+/* ================= 3 · WISP — no body, only light ================= */
+.d3 { width: 44px; height: 22px; filter: blur(10px);
+  background: radial-gradient(closest-side, var(--c1), var(--c2) 55%, transparent 78%);
+  opacity: calc(var(--lift) * .85);
+  animation: morph 7s ease-in-out infinite, breathe 3s ease-in-out infinite;
+  border-radius: 52% 48% 46% 54% / 58% 42% 58% 42%;
+}
+[data-state=rec]   .d3 { width: 116px; height: 46px }
+[data-state=think] .d3 { width: 86px; height: 40px; animation-duration: 2.4s, 1s }
+[data-state=done]  .d3 { width: 70px; height: 34px }
+.d3::after { content: ""; position: absolute; inset: 26% 18%; border-radius: 50%;
+  background: radial-gradient(closest-side, #ffffffcc, transparent 70%); filter: blur(5px) }
+
+/* ================= 4 · ECLIPSE — dark disc, colour corona ================= */
+.d4 { width: 34px; height: 34px; border-radius: 50%; background: #06070b;
+  box-shadow: 0 6px 22px #000c, inset 0 1px 0 #ffffff1c;
+  transform: scale(.62);
+}
+[data-state=rec] .d4   { transform: scale(1) }
+[data-state=think] .d4 { transform: scale(.88) }
+[data-state=done] .d4  { transform: scale(.8) }
+.d4::before { content: ""; position: absolute; inset: -20px; border-radius: 50%; z-index: -1;
+  background: conic-gradient(from 0deg, var(--c1), var(--c2), var(--c1));
+  filter: blur(13px); opacity: var(--lift); animation: drift 7s linear infinite;
+  transition: opacity .4s }
+[data-state=think] .d4::before { animation-duration: 1.8s }
+.d4::after { content: ""; position: absolute; inset: 3px; border-radius: 50%;
+  background: radial-gradient(circle at 34% 26%, #ffffff22, transparent 55%) }
+
+/* ================= 5 · LENS — refracting glass slab ================= */
+.d5 { width: 34px; height: 20px;
+  backdrop-filter: blur(3px) saturate(190%) brightness(1.15);
+  background: linear-gradient(180deg, #ffffff1c, #ffffff06);
+  box-shadow: inset 0 1px 1px #ffffff59, inset 0 -1px 2px #ffffff26,
+              0 10px 28px #000a,
+              -1.5px 0 8px color-mix(in srgb, var(--c1) 60%, transparent),
+               1.5px 0 8px color-mix(in srgb, var(--c2) 60%, transparent);
+  animation: morph 8s ease-in-out infinite;
+  border-radius: 52% 48% 46% 54% / 58% 42% 58% 42%;
+  opacity: calc(.55 + var(--lift) * .45);
+}
+[data-state=rec]   .d5 { width: 104px; height: 44px }
+[data-state=think] .d5 { width: 82px; height: 40px; animation-duration: 2.2s }
+[data-state=done]  .d5 { width: 66px; height: 34px }
+.d5::before { content: ""; position: absolute; inset: 0; border-radius: inherit;
+  background: linear-gradient(105deg, transparent 30%,
+    color-mix(in srgb, var(--c1) 45%, transparent) 47%,
+    #ffffffaa 50%,
+    color-mix(in srgb, var(--c2) 45%, transparent) 53%, transparent 70%);
+  opacity: var(--lift); filter: blur(1px); animation: sweep 3.4s ease-in-out infinite }
+@keyframes sweep { 0%,100% { transform: translateX(-14%) } 50% { transform: translateX(14%) } }
+[data-state=think] .d5::before { animation-duration: 1.1s }
+</style>
+
+<header>
+  <h1>Silent Whisper — liquid glass set</h1>
+  <p>No text, no fixed shape. Click a tile to cycle states; colour and size carry the meaning.</p>
+  <div class="legend">
+    <span><i style="background:#8a93a5"></i> idle — grey, tiny, barely there</span>
+    <span><i style="background:linear-gradient(90deg,#00d8ff,#6a5cff)"></i> recording — cyan→violet, wide</span>
+    <span><i style="background:linear-gradient(90deg,#ffb03a,#ff4fa3)"></i> transcribing — amber→pink, fast</span>
+    <span><i style="background:#3ce87a"></i> pasted — green pulse, then fades</span>
+  </div>
+</header>
+
+<svg width="0" height="0" style="position:absolute">
+  <filter id="goo">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="7" result="b"/>
+    <feColorMatrix in="b" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 22 -10"/>
+  </filter>
+</svg>
+
+<div class="grid">
+
+  <div class="card">
+    <h2>1 · Prism</h2>
+    <p class="note">Glossy black bead, iridescent seam glowing through the middle. Your reference, basically.</p>
+    <div class="stage" data-state="idle"><div class="o d1"></div></div>
+    <div class="state-tag"></div>
+  </div>
+
+  <div class="card">
+    <h2>2 · Droplet</h2>
+    <p class="note">Metaballs — satellites split off the core and merge back. Fully liquid.</p>
+    <div class="stage" data-state="idle"><div class="o d2"><b class="m"></b><b class="s1"></b><b class="s2"></b></div></div>
+    <div class="state-tag"></div>
+  </div>
+
+  <div class="card">
+    <h2>3 · Wisp</h2>
+    <p class="note">No object at all — a smear of light that morphs and breathes.</p>
+    <div class="stage" data-state="idle"><div class="o d3"></div></div>
+    <div class="state-tag"></div>
+  </div>
+
+  <div class="card">
+    <h2>4 · Eclipse</h2>
+    <p class="note">Dark disc with a rotating corona bleeding out behind it.</p>
+    <div class="stage" data-state="idle"><div class="o d4"></div></div>
+    <div class="state-tag"></div>
+  </div>
+
+  <div class="card">
+    <h2>5 · Lens</h2>
+    <p class="note">Real glass — blurs what's behind it, chromatic fringe on the edges, light sweeping across.</p>
+    <div class="stage" data-state="idle"><div class="o d5"></div></div>
+    <div class="state-tag"></div>
+  </div>
+
+</div>
+
+<script>
+const STATES = ["idle", "rec", "think", "done"];
+const TAG = { idle: "idle", rec: "recording", think: "transcribing", done: "pasted" };
+document.querySelectorAll(".stage").forEach(stage => {
+  const tag = stage.parentElement.querySelector(".state-tag");
+  const apply = s => { stage.dataset.state = s; tag.textContent = TAG[s] };
+  apply("idle");
+  stage.onclick = () => apply(STATES[(STATES.indexOf(stage.dataset.state) + 1) % 4]);
+});
+</script>

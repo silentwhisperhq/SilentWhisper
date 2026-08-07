@@ -1,0 +1,267 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Silent Whisper — pill designs</title>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  min-height: 100vh;
+  background: radial-gradient(1200px 800px at 20% 0%, #1c2333, #0a0c11 60%);
+  color: #e9ecf1;
+  font: 14px/1.5 -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  padding: 56px 32px 96px;
+  -webkit-font-smoothing: antialiased;
+}
+header { max-width: 1100px; margin: 0 auto 48px; }
+h1 { font-size: 22px; font-weight: 600; letter-spacing: -.02em; }
+header p { color: #8b93a3; margin-top: 6px; }
+kbd {
+  font: 11px ui-monospace, SFMono-Regular, monospace; background: #ffffff14;
+  border: 1px solid #ffffff1f; border-radius: 5px; padding: 1px 5px; color: #c3cad6;
+}
+.grid {
+  max-width: 1100px; margin: 0 auto;
+  display: grid; grid-template-columns: repeat(auto-fit, minmax(300px, 1fr)); gap: 20px;
+}
+.card {
+  background: #ffffff08; border: 1px solid #ffffff12; border-radius: 18px;
+  padding: 22px; display: flex; flex-direction: column; gap: 18px;
+  min-height: 210px;
+}
+.card h2 { font-size: 13px; font-weight: 600; letter-spacing: .02em; }
+.card .note { font-size: 12px; color: #7d8595; margin-top: -12px; }
+.stage {
+  flex: 1; display: grid; place-items: center;
+  background: linear-gradient(180deg, #0d1017, #12161f);
+  border-radius: 12px; padding: 28px 16px;
+  border: 1px solid #ffffff0a;
+}
+.state-tag {
+  font: 10px ui-monospace, monospace; letter-spacing: .08em; text-transform: uppercase;
+  color: #626b7c; text-align: center;
+}
+
+/* ---------- shared pill mechanics ---------- */
+.pill {
+  cursor: pointer; user-select: none; display: flex; align-items: center;
+  transition: width .38s cubic-bezier(.2,.9,.25,1), height .38s cubic-bezier(.2,.9,.25,1),
+              background .3s, box-shadow .3s, border-radius .38s cubic-bezier(.2,.9,.25,1),
+              padding .38s cubic-bezier(.2,.9,.25,1), opacity .3s;
+}
+.pill .label { white-space: nowrap; overflow: hidden; font-size: 12.5px; font-weight: 500; }
+.wave { display: flex; align-items: center; gap: 3px; height: 18px; }
+.wave i {
+  display: block; width: 3px; height: 4px; border-radius: 2px; background: currentColor;
+  animation: bounce .9s ease-in-out infinite; opacity: .85;
+}
+.wave i:nth-child(1){ animation-delay: 0s }    .wave i:nth-child(2){ animation-delay: .12s }
+.wave i:nth-child(3){ animation-delay: .24s }  .wave i:nth-child(4){ animation-delay: .36s }
+.wave i:nth-child(5){ animation-delay: .18s }  .wave i:nth-child(6){ animation-delay: .3s }
+.wave i:nth-child(7){ animation-delay: .06s }
+@keyframes bounce { 0%,100% { height: 4px } 50% { height: 17px } }
+.pill:not([data-state=rec]) .wave i { animation-play-state: paused; height: 4px }
+.check { width: 14px; height: 14px; flex: none }
+.check path { stroke: currentColor; stroke-width: 2.4; fill: none; stroke-linecap: round; stroke-linejoin: round;
+  stroke-dasharray: 20; stroke-dashoffset: 20; }
+[data-state=done] .check path { animation: draw .3s .05s ease forwards }
+@keyframes draw { to { stroke-dashoffset: 0 } }
+
+/* ================= 1. FLOW — the classic ================= */
+.p1 {
+  color: #fff; gap: 10px; padding: 0 14px; height: 38px; width: 38px;
+  justify-content: center;
+  background: rgba(22,24,29,.88); backdrop-filter: blur(24px) saturate(160%);
+  border: 1px solid #ffffff1c; border-radius: 999px;
+  box-shadow: 0 8px 30px #0009, inset 0 1px 0 #ffffff1f;
+}
+.p1 .label { max-width: 0; opacity: 0; transition: max-width .38s, opacity .2s }
+.p1[data-state=rec], .p1[data-state=think], .p1[data-state=done] { width: 168px; justify-content: flex-start }
+.p1[data-state=rec] { box-shadow: 0 8px 30px #0009, inset 0 1px 0 #ffffff1f, 0 0 0 3px #4f8cff26 }
+.p1[data-state=rec] .label, .p1[data-state=think] .label, .p1[data-state=done] .label { max-width: 120px; opacity: .95 }
+.p1 .idle-dot { width: 7px; height: 7px; border-radius: 50%; background: #6f7a8c; flex: none }
+.p1[data-state=rec] .idle-dot { background: #ff5f57; box-shadow: 0 0 10px #ff5f57cc; animation: blink 1.4s infinite }
+@keyframes blink { 50% { opacity: .35 } }
+.p1[data-state=done] .idle-dot { background: #32d74b }
+
+/* ================= 2. MORPH — dot → capsule ================= */
+.p2 {
+  color: #fff; background: #06070a; border-radius: 999px;
+  width: 14px; height: 14px; padding: 0; justify-content: center; gap: 8px;
+  border: 1px solid #ffffff14;
+  box-shadow: 0 6px 24px #000c;
+}
+.p2 > * { opacity: 0; transition: opacity .18s }
+.p2[data-state=rec], .p2[data-state=think], .p2[data-state=done] {
+  width: 150px; height: 34px; padding: 0 13px; justify-content: space-between;
+}
+.p2[data-state=rec] > *, .p2[data-state=think] > *, .p2[data-state=done] > * { opacity: 1; transition-delay: .16s }
+.p2[data-state=idle] { animation: breathe 3s ease-in-out infinite }
+@keyframes breathe { 50% { transform: scale(1.35); opacity: .75 } }
+.p2 .label { font: 11px/1 ui-monospace, monospace; letter-spacing: .06em; color: #97a1b2 }
+.p2 .wave { color: #fff }
+
+/* ================= 3. HALO — glass + rotating ring ================= */
+.p3 {
+  position: relative; color: #16181d; gap: 10px; height: 40px; padding: 0 16px; width: 170px;
+  justify-content: center;
+  background: rgba(255,255,255,.82); backdrop-filter: blur(20px);
+  border-radius: 999px; box-shadow: 0 10px 34px #0007;
+}
+.p3::before {
+  content: ""; position: absolute; inset: -2px; border-radius: 999px; z-index: -1;
+  background: conic-gradient(from 0deg, #6ea8ff, #b06cff, #ff6ea8, #6ea8ff);
+  opacity: 0; transition: opacity .3s; filter: blur(3px);
+}
+.p3[data-state=rec]::before { opacity: 1; animation: spin 2.2s linear infinite }
+.p3[data-state=think]::before { opacity: .5; animation: spin 1s linear infinite }
+@keyframes spin { to { transform: rotate(1turn) } }
+.p3[data-state=idle] { width: 44px; padding: 0; background: rgba(255,255,255,.7) }
+.p3[data-state=idle] .label { max-width: 0; opacity: 0 }
+.p3 .label { color: #3a3f4a; transition: max-width .38s, opacity .2s; max-width: 110px }
+.p3 .wave { color: #16181d }
+.p3 .mic { width: 15px; height: 15px; flex: none; fill: #16181d }
+
+/* ================= 4. RAIL — industrial / mono ================= */
+.p4 {
+  color: #d8e2ea; gap: 10px; height: 30px; padding: 0 11px; width: 190px;
+  background: #0e1116; border: 1px solid #2a323e; border-radius: 8px;
+  font: 11px/1 ui-monospace, SFMono-Regular, monospace;
+  box-shadow: 0 6px 20px #000a;
+}
+.p4[data-state=idle] { width: 92px }
+.p4 .label { font: 11px/1 ui-monospace, monospace; letter-spacing: .09em; text-transform: uppercase; color: #8e9bab }
+.p4[data-state=rec] .label { color: #ff8a4c }
+.p4[data-state=done] .label { color: #4ade80 }
+.p4 .meter { display: flex; gap: 2px; margin-left: auto }
+.p4 .meter b { width: 3px; height: 12px; background: #232b36; border-radius: 1px; display: block }
+.p4[data-state=rec] .meter b { animation: lit 1.1s steps(1) infinite; background: #ff8a4c }
+.p4 .meter b:nth-child(1){animation-delay:0s} .p4 .meter b:nth-child(2){animation-delay:.1s}
+.p4 .meter b:nth-child(3){animation-delay:.2s} .p4 .meter b:nth-child(4){animation-delay:.3s}
+.p4 .meter b:nth-child(5){animation-delay:.4s} .p4 .meter b:nth-child(6){animation-delay:.5s}
+@keyframes lit { 0%,60% { background: #ff8a4c } 61%,100% { background: #232b36 } }
+
+/* ================= 5. AURORA — soft gradient orb ================= */
+.p5 {
+  position: relative; overflow: hidden; color: #fff; gap: 10px;
+  height: 40px; width: 176px; padding: 0 16px; justify-content: center;
+  border-radius: 999px; background: #12131a; border: 1px solid #ffffff14;
+  box-shadow: 0 12px 40px #000b;
+}
+.p5::after {
+  content: ""; position: absolute; inset: -60%; z-index: 0; opacity: .0; transition: opacity .4s;
+  background:
+    radial-gradient(40% 60% at 25% 50%, #7c5cff 0%, transparent 70%),
+    radial-gradient(40% 60% at 60% 40%, #2ad4ff 0%, transparent 70%),
+    radial-gradient(40% 60% at 85% 60%, #ff5cae 0%, transparent 70%);
+  filter: blur(14px);
+}
+.p5[data-state=rec]::after { opacity: .85; animation: drift 6s linear infinite }
+.p5[data-state=think]::after { opacity: .5; animation: drift 2s linear infinite }
+.p5[data-state=done]::after { opacity: .3 }
+@keyframes drift { to { transform: rotate(1turn) } }
+.p5 > * { position: relative; z-index: 1 }
+.p5[data-state=idle] { width: 40px; padding: 0 }
+.p5[data-state=idle] .label { max-width: 0; opacity: 0 }
+.p5 .label { transition: max-width .38s, opacity .2s; max-width: 110px; text-shadow: 0 1px 6px #0008 }
+.p5 .mic { width: 15px; height: 15px; flex: none; fill: #fff; opacity: .9 }
+</style>
+
+<header>
+  <h1>Silent Whisper — pill concepts</h1>
+  <p>Click a pill to cycle: <kbd>idle</kbd> → <kbd>recording</kbd> → <kbd>transcribing</kbd> → <kbd>pasted</kbd>. Pick one (or mix parts) and I'll build it in SwiftUI.</p>
+</header>
+
+<div class="grid">
+
+  <div class="card">
+    <h2>1 · Flow</h2>
+    <p class="note">Closest to Wispr. Blurred dark capsule, grows from a dot.</p>
+    <div class="stage">
+      <div class="pill p1" data-state="idle">
+        <span class="idle-dot"></span>
+        <span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+        <span class="label"></span>
+        <svg class="check" viewBox="0 0 16 16"><path d="M3 8.5l3.2 3.2L13 5"/></svg>
+      </div>
+    </div>
+    <div class="state-tag"></div>
+  </div>
+
+  <div class="card">
+    <h2>2 · Morph</h2>
+    <p class="note">Invisible until needed. A breathing 14px dot that unfolds.</p>
+    <div class="stage">
+      <div class="pill p2" data-state="idle">
+        <span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+        <span class="label"></span>
+        <svg class="check" viewBox="0 0 16 16"><path d="M3 8.5l3.2 3.2L13 5"/></svg>
+      </div>
+    </div>
+    <div class="state-tag"></div>
+  </div>
+
+  <div class="card">
+    <h2>3 · Halo</h2>
+    <p class="note">Light glass, conic gradient ring spins while listening.</p>
+    <div class="stage">
+      <div class="pill p3" data-state="idle">
+        <svg class="mic" viewBox="0 0 24 24"><path d="M12 14a3 3 0 003-3V6a3 3 0 10-6 0v5a3 3 0 003 3zm5-3a5 5 0 01-10 0H5a7 7 0 006 6.92V21h2v-3.08A7 7 0 0019 11h-2z"/></svg>
+        <span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+        <span class="label"></span>
+        <svg class="check" viewBox="0 0 16 16"><path d="M3 8.5l3.2 3.2L13 5"/></svg>
+      </div>
+    </div>
+    <div class="state-tag"></div>
+  </div>
+
+  <div class="card">
+    <h2>4 · Rail</h2>
+    <p class="note">Mono, squared-off, timer + level meter. Dev-tool energy.</p>
+    <div class="stage">
+      <div class="pill p4" data-state="idle">
+        <span class="label"></span>
+        <span class="meter"><b></b><b></b><b></b><b></b><b></b><b></b></span>
+        <svg class="check" viewBox="0 0 16 16"><path d="M3 8.5l3.2 3.2L13 5"/></svg>
+      </div>
+    </div>
+    <div class="state-tag"></div>
+  </div>
+
+  <div class="card">
+    <h2>5 · Aurora</h2>
+    <p class="note">Dark capsule, colour bleeding through from inside while live.</p>
+    <div class="stage">
+      <div class="pill p5" data-state="idle">
+        <svg class="mic" viewBox="0 0 24 24"><path d="M12 14a3 3 0 003-3V6a3 3 0 10-6 0v5a3 3 0 003 3zm5-3a5 5 0 01-10 0H5a7 7 0 006 6.92V21h2v-3.08A7 7 0 0019 11h-2z"/></svg>
+        <span class="wave"><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span>
+        <span class="label"></span>
+        <svg class="check" viewBox="0 0 16 16"><path d="M3 8.5l3.2 3.2L13 5"/></svg>
+      </div>
+    </div>
+    <div class="state-tag"></div>
+  </div>
+
+</div>
+
+<script>
+const STATES = ["idle", "rec", "think", "done"];
+const TAG = { idle: "idle · fn to talk", rec: "recording", think: "transcribing", done: "pasted → cursor" };
+// label text differs per design; index matches .p1….p5
+const LABEL = {
+  rec:   ["Listening…", "0:03",       "Listening…", "REC 0:03", "Listening…"],
+  think: ["Transcribing…", "0:03",    "Thinking…",  "WHISPER…", "Transcribing…"],
+  done:  ["Pasted", "done",           "Pasted",     "PASTED",   "Pasted"],
+  idle:  ["", "", "Hold fn to talk",  "IDLE",       "Hold fn to talk"],
+};
+
+document.querySelectorAll(".pill").forEach((pill, i) => {
+  const tag = pill.closest(".card").querySelector(".state-tag");
+  const label = pill.querySelector(".label");
+  const apply = s => {
+    pill.dataset.state = s;
+    label.textContent = LABEL[s][i];
+    tag.textContent = TAG[s];
+  };
+  apply("idle");
+  pill.onclick = () => apply(STATES[(STATES.indexOf(pill.dataset.state) + 1) % 4]);
+});
+</script>

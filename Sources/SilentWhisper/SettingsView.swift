@@ -1,0 +1,158 @@
+import ServiceManagement
+import SwiftUI
+
+/// Models WhisperKit can pull down on demand. Bigger is slower but sharper.
+/// The `.en` variants are English-only — they will happily return nonsense for other languages.
+let availableModels = ["tiny", "base", "small", "medium", "large-v3_turbo", "base.en", "small.en"]
+
+/// A short list rather than all 99 Whisper languages — auto-detect covers the rest.
+let languages: [(code: String, name: String)] = [
+    ("auto", "Detect automatically"),
+    ("tr", "Türkçe"), ("en", "English"), ("de", "Deutsch"), ("fr", "Français"),
+    ("es", "Español"), ("it", "Italiano"), ("nl", "Nederlands"), ("pt", "Português"),
+    ("ru", "Русский"), ("ar", "العربية"), ("ja", "日本語"), ("zh", "中文"), ("ko", "한국어"),
+]
+
+struct SettingsView: View {
+    @EnvironmentObject var engine: Engine
+    @EnvironmentObject var updater: Updater
+    @AppStorage("model") private var model = "small"
+    @AppStorage("language") private var language = "auto"
+    @AppStorage("autoPaste") private var autoPaste = true
+    @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
+    @State private var trusted = AXIsProcessTrusted()
+
+    var body: some View {
+        Form {
+            Section {
+                Picker("Language", selection: $language) {
+                    ForEach(languages, id: \.code) { Text($0.name).tag($0.code) }
+                }
+
+                Picker("Model", selection: $model) {
+                    ForEach(availableModels, id: \.self, content: Text.init)
+                }
+                .onChange(of: model) { engine.reloadModel() }
+
+                Text(modelHint)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                switch engine.model {
+                case .downloading(let fraction):
+                    VStack(alignment: .leading, spacing: 4) {
+                        ProgressView(value: fraction)
+                        Text(engine.model.label)
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
+                case .warming:
+                    LabeledContent("Status") {
+                        HStack(spacing: 6) {
+                            ProgressView().controlSize(.small)
+                            Text("Warming up…").foregroundStyle(.secondary)
+                        }
+                    }
+                case .ready:
+                    LabeledContent("Status") { Text("Ready").foregroundStyle(.green) }
+                case .failed(let why):
+                    LabeledContent("Status") { Text(why).foregroundStyle(.red) }
+                }
+
+                Text("You can talk while this finishes — the recording is held and transcribed as soon as the model is up.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+
+            Section {
+                Picker("Look", selection: $engine.theme) {
+                    ForEach(Theme.allCases) { Text($0.label).tag($0) }
+                }
+                .pickerStyle(.segmented)
+            }
+
+            Section {
+                Toggle("Paste automatically", isOn: $autoPaste)
+                Text("Always copies to the clipboard. When on, it also presses ⌘V for you.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if !trusted {
+                    LabeledContent("Accessibility") {
+                        Button("Grant…") {
+                            NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility")!)
+                        }
+                    }
+                    Text("Without it, both the hotkey and auto-paste stay dead. macOS revokes this every time the app is rebuilt — re-add it, or remove the old entry first if the toggle looks stuck on.")
+                        .font(.caption)
+                        .foregroundStyle(.orange)
+                }
+
+                Toggle("Launch at login", isOn: $launchAtLogin)
+                    .onChange(of: launchAtLogin) { _, on in
+                        // Throws when the app runs from a location macOS won't register (e.g. a DMG).
+                        do { on ? try SMAppService.mainApp.register() : try SMAppService.mainApp.unregister() }
+                        catch { launchAtLogin = SMAppService.mainApp.status == .enabled }
+                    }
+            }
+
+            Section {
+                LabeledContent("Push to talk", value: "Hold right ⌥")
+                LabeledContent("Or", value: "Click the blob")
+            }
+
+            Section {
+                LabeledContent("Version") {
+                    switch updater.status {
+                    case .checking:
+                        HStack(spacing: 6) {
+                            ProgressView().controlSize(.small)
+                            Text(updater.currentVersion).foregroundStyle(.secondary)
+                        }
+                    case .available(let version, _):
+                        HStack(spacing: 8) {
+                            Text("\(updater.currentVersion) → \(version)")
+                            Button("Update") { Task { await updater.download() } }
+                        }
+                    case .downloading(let fraction):
+                        HStack(spacing: 8) {
+                            ProgressView(value: fraction).frame(width: 90)
+                            Text("Downloading…").foregroundStyle(.secondary)
+                        }
+                    case .readyToRelaunch:
+                        Button("Relaunch to finish") { updater.relaunch() }
+                    case .failed(let why):
+                        HStack(spacing: 8) {
+                            Text(why).foregroundStyle(.red).lineLimit(1)
+                            Button("Retry") { Task { await updater.check() } }
+                        }
+                    case .upToDate, .idle:
+                        HStack(spacing: 8) {
+                            Text(updater.currentVersion).foregroundStyle(.secondary)
+                            Button("Check") { Task { await updater.check() } }
+                        }
+                    }
+                }
+            }
+        }
+        .formStyle(.grouped)
+        .frame(width: 400)
+        .fixedSize(horizontal: false, vertical: true)
+        .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) {
+            _ in trusted = AXIsProcessTrusted()   // no notification for this; poll while the window is open
+        }
+    }
+
+    private var modelHint: String {
+        if model.hasSuffix(".en") {
+            return "English only — anything else comes back as garbage. Pick a model without “.en” for Türkçe."
+        }
+        switch model {
+        case "tiny":  return "Fastest, roughest. Weak outside English."
+        case "base":  return "Quick, but shaky on Turkish names and endings."
+        case "small": return "The default — the smallest model that handles Türkçe properly."
+        case "medium": return "Better again, noticeably slower on long takes."
+        default:      return "Most accurate. First run downloads about 1.5 GB."
+        }
+    }
+}
