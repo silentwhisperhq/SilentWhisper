@@ -5,6 +5,17 @@ import SwiftUI
 /// The `.en` variants are English-only — they will happily return nonsense for other languages.
 let availableModels = ["tiny", "base", "small", "medium", "large-v3_turbo", "base.en", "small.en"]
 
+/// Which models are already on disk, so the picker can mark them and you know which
+/// choices are instant and which mean a download plus a long first compile.
+var downloadedModels: Set<String> {
+    let base = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("huggingface/models/argmaxinc/whisperkit-coreml")
+    let folders = (try? FileManager.default.contentsOfDirectory(atPath: base.path)) ?? []
+    return Set(folders.compactMap { folder in
+        folder.hasPrefix("openai_whisper-") ? String(folder.dropFirst("openai_whisper-".count)) : nil
+    })
+}
+
 /// A short list rather than all 99 Whisper languages — auto-detect covers the rest.
 let languages: [(code: String, name: String)] = [
     ("auto", "Detect automatically"),
@@ -30,7 +41,9 @@ struct SettingsView: View {
                 }
 
                 Picker("Model", selection: $model) {
-                    ForEach(availableModels, id: \.self, content: Text.init)
+                    ForEach(availableModels, id: \.self) { name in
+                        Text(downloadedModels.contains(name) ? "\(name) ✓" : name).tag(name)
+                    }
                 }
                 .onChange(of: model) { engine.reloadModel() }
 
@@ -50,7 +63,7 @@ struct SettingsView: View {
                     LabeledContent("Status") {
                         HStack(spacing: 6) {
                             ProgressView().controlSize(.small)
-                            Text("Warming up…").foregroundStyle(.secondary)
+                            Text(engine.model.label).foregroundStyle(.secondary)
                         }
                     }
                 case .ready:
@@ -59,9 +72,14 @@ struct SettingsView: View {
                     LabeledContent("Status") { Text(why).foregroundStyle(.red) }
                 }
 
-                Text("You can talk while this finishes — the recording is held and transcribed as soon as the model is up.")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
+                if let detail = engine.model.detail {
+                    Text(detail)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                    Text("You can talk while this finishes — the recording is held and transcribed as soon as the model is up.")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
             }
 
             Section {

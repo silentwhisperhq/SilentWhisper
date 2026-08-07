@@ -24,9 +24,19 @@ enum ModelStatus: Equatable {
     var label: String {
         switch self {
         case .downloading(let f): "Downloading… \(Int(f * 100))%"
-        case .warming: "Warming up…"
+        case .warming: "Compiling for the Neural Engine…"
         case .ready: "Ready"
         case .failed(let why): "Failed — \(why)"
+        }
+    }
+
+    /// Compilation is a one-time, multi-minute, 100%-CPU affair the first time a model is
+    /// used on a machine. Without saying so it reads as a hang.
+    var detail: String? {
+        switch self {
+        case .downloading: "Already-downloaded models are reused — this only fetches what's missing."
+        case .warming: "One-time per model, and it can take a few minutes. Cached from then on."
+        default: nil
         }
     }
 }
