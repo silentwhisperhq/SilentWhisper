@@ -36,6 +36,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         buildStatusItem()
         updater.startPeriodicChecks()
 
+        // Lets a test instance land straight on the pane that is being measured.
+        if CommandLine.arguments.contains("--settings") { openSettings() }
+
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
             object: nil, queue: .main

@@ -75,9 +75,12 @@ func fallbackModel(for wanted: String, from onDisk: Set<String>) -> String? {
 @MainActor
 final class Engine: ObservableObject {
     @Published var state: PillState = .idle
-    @Published var amp: Double = 0          // smoothed mic level, 0…1
-    @Published var core: Double = 20        // smoothed core diameter, pt
-    @Published var sat: Double = 0          // smoothed satellite diameter, pt
+    // Deliberately NOT @Published: these change 60 times a second, and publishing them would
+    // re-render every observing view — including Settings — at the same rate. PillView reads
+    // them from inside a TimelineView, which already redraws each frame.
+    var amp: Double = 0                     // smoothed mic level, 0…1
+    var core: Double = 20                   // smoothed core diameter, pt
+    var sat: Double = 0                     // smoothed satellite diameter, pt
     @Published var theme: Theme = Theme(rawValue: UserDefaults.standard.string(forKey: "theme") ?? "") ?? .obsidian {
         didSet { UserDefaults.standard.set(theme.rawValue, forKey: "theme") }
     }
@@ -90,6 +93,7 @@ final class Engine: ObservableObject {
     func refreshMotionPreference() { calmMotion = Engine.reducedMotion }
 
     private var whisper: WhisperKit?
+    private var activeModel: String?        // the model `whisper` was built from
     private var modelTask: Task<Void, Never>?
     private let engine = AVAudioEngine()
     private let mic = Mic()
@@ -157,6 +161,9 @@ final class Engine: ObservableObject {
 
     /// Swap models without a relaunch. Drops any in-flight take first.
     func reloadModel() {
+        // Cancelling a download rewrites the preference to whatever is already running, and
+        // that must not kick off a reload of the model we are literally using.
+        if Engine.modelName == activeModel, whisper != nil { return }
         if state == .recording { stopRecording() }
         modelTask?.cancel()
         whisper = nil
@@ -168,6 +175,9 @@ final class Engine: ObservableObject {
         modelTask?.cancel()
         modelTask = nil
         if case .substituting(let using, _, _) = model {
+            // Point the picker at what is actually running — leaving it on the abandoned
+            // model claims a download that will never arrive.
+            UserDefaults.standard.set(using, forKey: "model")
             model = .ready(using)
         } else if whisper == nil {
             model = .failed("cancelled")
@@ -230,6 +240,7 @@ final class Engine: ObservableObject {
             let loaded = try await WhisperKit(config)
             guard !Task.isCancelled else { return }
             whisper = loaded
+            activeModel = name
             if let report { model = .ready(report) }
         } catch {
             guard !Task.isCancelled else { return }

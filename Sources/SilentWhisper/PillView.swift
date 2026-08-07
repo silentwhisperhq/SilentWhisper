@@ -175,7 +175,9 @@ struct PillView: View {
     @EnvironmentObject var engine: Engine
 
     var body: some View {
-        TimelineView(.animation) { timeline in
+        // Paused while idle: the blob is off-screen then, and an unpaused schedule keeps a
+        // display link — and the whole SwiftUI render pipeline — running at 60 Hz for nothing.
+        TimelineView(.animation(minimumInterval: nil, paused: engine.state == .idle)) { timeline in
             // Freezing t holds the swarm in its resting pose: the blob still answers your
             // voice through `amp`, it just stops orbiting.
             let t = engine.calmMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate

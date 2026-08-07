@@ -56,6 +56,10 @@ struct SettingsView: View {
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var trusted = AXIsProcessTrusted()
 
+    /// Scanning the model cache touches the disk, so it happens on appear and when a
+    /// download finishes — never inside `body`, which SwiftUI may run at any rate.
+    @State private var onDisk: Set<String> = []
+
     var body: some View {
         Form {
             Section {
@@ -65,7 +69,7 @@ struct SettingsView: View {
 
                 Picker("Model", selection: $model) {
                     ForEach(availableModels, id: \.self) { name in
-                        Text(downloadedModels.contains(name) ? "\(name) ✓" : name).tag(name)
+                        Text(onDisk.contains(name) ? "\(name) ✓" : name).tag(name)
                     }
                 }
                 .onChange(of: model) { engine.reloadModel() }
@@ -227,6 +231,8 @@ struct SettingsView: View {
         .scrollContentBackground(.hidden)   // let the window's blur show through
         .frame(width: 400)
         .fixedSize(horizontal: false, vertical: true)
+        .onAppear { onDisk = downloadedModels }
+        .onChange(of: engine.model) { onDisk = downloadedModels }
         .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) {
             _ in trusted = AXIsProcessTrusted()   // no notification for this; poll while the window is open
         }
