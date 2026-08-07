@@ -233,8 +233,8 @@ final class Engine: ObservableObject {
 
     // MARK: - recording
 
-    /// Clicking always ends whatever is happening: stop a recording, abandon a transcription,
-    /// otherwise start a new take.
+    /// Clicking ends the take and transcribes it; clicking again while that is still running
+    /// abandons it. No button needed — the blob is the control.
     func toggle() {
         switch state {
         case .recording: stopRecording()

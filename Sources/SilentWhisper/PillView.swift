@@ -216,25 +216,6 @@ struct PillView: View {
         .contentShape(Rectangle())
         .onTapGesture { engine.toggle() }
         .help(engine.state.caption)
-        .overlay(alignment: .topTrailing) { cancelButton }
-    }
-
-    /// Only offered while there is something to throw away.
-    @ViewBuilder private var cancelButton: some View {
-        if engine.state == .recording || engine.state == .transcribing {
-            Button { engine.cancel() } label: {
-                Image(systemName: "xmark")
-                    .font(.system(size: 9, weight: .bold))
-                    .foregroundStyle(.white.opacity(0.85))
-                    .frame(width: 18, height: 18)
-                    .background(.black.opacity(0.45), in: Circle())
-                    .overlay(Circle().strokeBorder(.white.opacity(0.25)))
-            }
-            .buttonStyle(.plain)
-            .padding(6)
-            .help("Discard this take")
-            .transition(.opacity)
-        }
     }
 
     /// A lit edge around the whole shape: the goo filled with a light gradient, with a
