@@ -28,15 +28,25 @@ if xcrun notarytool history --keychain-profile silentwhisper >/dev/null 2>&1; th
   fi
 fi
 
+# The DMG is the human download; the zip stays for the in-app updater.
+./makedmg.sh
+DMG="SilentWhisper-$VERSION.dmg"
+if [ "$NOTARIZED" = yes ]; then
+  xcrun notarytool submit "$DMG" --keychain-profile silentwhisper --wait
+  xcrun stapler staple "$DMG"
+fi
+
 git add -A
 git commit -m "Release $VERSION" || true
 git tag -f "v$VERSION"
 git push origin main --tags --force
 
-gh release create "v$VERSION" "$ZIP" \
+gh release create "v$VERSION" "$DMG" "$ZIP" \
   --title "v$VERSION" \
-  --notes "Push-to-talk dictation. Hold right ⌥, talk, and the text lands where your cursor is." \
-  || gh release upload "v$VERSION" "$ZIP" --clobber
+  --notes "Push-to-talk dictation. Hold right ⌥, talk, and the text lands where your cursor is.
+
+Download the **.dmg** and drag Silent Whisper to Applications. The .zip is what the in-app updater uses." \
+  || gh release upload "v$VERSION" "$DMG" "$ZIP" --clobber
 
 echo
 echo "──────────────────────────────────────────────"

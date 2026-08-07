@@ -1,0 +1,102 @@
+name: Release
+
+# Tag a version and CI does the rest:  git tag v1.0.7 && git push --tags
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "Version to build, e.g. 1.0.7"
+        required: true
+
+jobs:
+  release:
+    runs-on: macos-15
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Work out the version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF_NAME#v}"
+          fi
+          echo "value=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "$VERSION" > VERSION
+
+      - name: Cache SwiftPM dependencies
+        uses: actions/cache@v4
+        with:
+          path: .build
+          key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
+          restore-keys: spm-${{ runner.os }}-
+
+      # A throwaway keychain keeps the cert out of the default one and dies with the runner.
+      - name: Import signing certificate
+        env:
+          CERT_P12: ${{ secrets.CERT_P12 }}
+          CERT_PASSWORD: ${{ secrets.CERT_PASSWORD }}
+        run: |
+          KEYCHAIN=$RUNNER_TEMP/build.keychain
+          KEYCHAIN_PASSWORD=$(uuidgen)
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security set-keychain-settings -lut 21600 "$KEYCHAIN"
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          echo "$CERT_P12" | base64 --decode > "$RUNNER_TEMP/cert.p12"
+          security import "$RUNNER_TEMP/cert.p12" -k "$KEYCHAIN" -P "$CERT_PASSWORD" \
+            -T /usr/bin/codesign -T /usr/bin/security
+          security set-key-partition-list -S apple-tool:,apple: -s -k "$KEYCHAIN_PASSWORD" "$KEYCHAIN"
+          security list-keychains -d user -s "$KEYCHAIN" login.keychain-db
+          rm -f "$RUNNER_TEMP/cert.p12"
+          security find-identity -v -p codesigning "$KEYCHAIN"
+
+      - name: Build and sign
+        run: SW_RELEASE=1 ./build.sh release
+
+      - name: Package
+        run: |
+          ditto -c -k --keepParent SilentWhisper.app "SilentWhisper-${{ steps.version.outputs.value }}.zip"
+          ./makedmg.sh
+
+      # Notarize both artifacts: the zip feeds the in-app updater, the DMG is the download.
+      - name: Notarize and staple
+        env:
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          TEAM_ID: ${{ secrets.TEAM_ID }}
+          APP_PASSWORD: ${{ secrets.APP_PASSWORD }}
+        run: |
+          V=${{ steps.version.outputs.value }}
+          xcrun notarytool submit "SilentWhisper-$V.zip" \
+            --apple-id "$APPLE_ID" --team-id "$TEAM_ID" --password "$APP_PASSWORD" --wait
+          xcrun stapler staple SilentWhisper.app
+
+          # Rebuild both containers so they carry the stapled app.
+          rm -f "SilentWhisper-$V.zip"
+          ditto -c -k --keepParent SilentWhisper.app "SilentWhisper-$V.zip"
+          ./makedmg.sh
+          xcrun notarytool submit "SilentWhisper-$V.dmg" \
+            --apple-id "$APPLE_ID" --team-id "$TEAM_ID" --password "$APP_PASSWORD" --wait
+          xcrun stapler staple "SilentWhisper-$V.dmg"
+
+      - name: Verify Gatekeeper accepts it
+        run: |
+          spctl -a -vvv -t install SilentWhisper.app
+          xcrun stapler validate "SilentWhisper-${{ steps.version.outputs.value }}.dmg"
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          V=${{ steps.version.outputs.value }}
+          gh release create "v$V" "SilentWhisper-$V.dmg" "SilentWhisper-$V.zip" \
+            --title "v$V" \
+            --notes "Push-to-talk dictation. Hold right ⌥, talk, and the text lands where your cursor is.
+
+          Download the **.dmg** and drag Silent Whisper to Applications. The .zip is what the in-app updater uses." \
+            || gh release upload "v$V" "SilentWhisper-$V.dmg" "SilentWhisper-$V.zip" --clobber
