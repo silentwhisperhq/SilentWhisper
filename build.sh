@@ -44,12 +44,19 @@ PLIST
 
 # A stable signing identity is what makes Accessibility permission survive a rebuild.
 # Ad-hoc works, but its hash changes every time, so macOS quietly revokes the grant.
+# Developer ID first: it is the identity that lets other people run the app, and it is
+# stable across machines. Apple Development works for local use only.
 # `|| true`: with pipefail a no-match grep would otherwise abort the whole script.
-IDENTITY=$(security find-identity -v -p codesigning 2>/dev/null \
-  | grep -oE '"(Apple Development|Developer ID Application)[^"]*"' | head -1 | tr -d '"' || true)
+CERTS=$(security find-identity -v -p codesigning 2>/dev/null || true)
+IDENTITY=$(echo "$CERTS" | grep -oE '"Developer ID Application[^"]*"' | head -1 | tr -d '"' || true)
+[ -n "$IDENTITY" ] || IDENTITY=$(echo "$CERTS" | grep -oE '"Apple Development[^"]*"' | head -1 | tr -d '"' || true)
 
 if [ -n "$IDENTITY" ]; then
-  codesign --force --deep --sign "$IDENTITY" "$APP"
+  # --options runtime is what notarization requires; the entitlements give the mic and
+  # CoreML compilation back afterwards.
+  codesign --force --deep --options runtime \
+    --entitlements SilentWhisper.entitlements \
+    --sign "$IDENTITY" "$APP"
   echo "signed with: $IDENTITY"
 else
   codesign --force --deep --sign - "$APP"
