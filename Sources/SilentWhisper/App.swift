@@ -36,6 +36,13 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         buildStatusItem()
         updater.startPeriodicChecks()
 
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
+            object: nil, queue: .main
+        ) { [weak self] _ in
+            MainActor.assumeIsolated { self?.engine.refreshMotionPreference() }
+        }
+
         // The blob is only ever on screen while something is happening: it fades in on
         // the hotkey and fades out again once the text has landed.
         stateWatch = engine.$state
@@ -84,7 +91,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             panel.orderFrontRegardless()
         }
         NSAnimationContext.runAnimationGroup { ctx in
-            ctx.duration = show ? 0.22 : 0.45
+            ctx.duration = engine.calmMotion ? 0 : (show ? 0.22 : 0.45)
             ctx.timingFunction = CAMediaTimingFunction(name: show ? .easeOut : .easeIn)
             panel.animator().alphaValue = show ? 1 : 0
         } completionHandler: { [weak self] in
@@ -112,6 +119,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                            accessibilityDescription: "Silent Whisper")
 
         let menu = NSMenu()
+        menu.addItem(withTitle: "Silent Whisper \(updater.currentVersion) beta · by Claude",
+                     action: nil, keyEquivalent: "")
         menu.addItem(withTitle: "Hold right ⌥ to talk", action: nil, keyEquivalent: "")
         menu.addItem(.separator())
 
@@ -127,13 +136,30 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
     @objc private func openSettings() {
         if settingsWindow == nil {
             let window = NSWindow(contentRect: .zero,
-                                  styleMask: [.titled, .closable],
+                                  styleMask: [.titled, .closable, .fullSizeContentView],
                                   backing: .buffered, defer: false)
             window.title = "Silent Whisper"
-            window.contentView = NSHostingView(rootView: SettingsView()
+            window.titlebarAppearsTransparent = true
+            window.isMovableByWindowBackground = true
+            window.isReleasedWhenClosed = false
+
+            // The blur has to come from a real NSVisualEffectView: SwiftUI materials only
+            // sample within the window, so they cannot pick up the desktop behind it.
+            let glass = NSVisualEffectView()
+            glass.material = .hudWindow
+            glass.blendingMode = .behindWindow
+            glass.state = .active
+
+            let host = NSHostingView(rootView: SettingsView()
                 .environmentObject(engine)
                 .environmentObject(updater))
-            window.isReleasedWhenClosed = false
+            host.autoresizingMask = [.width, .height]
+            host.frame = NSRect(origin: .zero, size: host.fittingSize)
+            glass.frame = host.frame
+            glass.addSubview(host)
+
+            window.contentView = glass
+            window.setContentSize(host.fittingSize)
             window.center()
             settingsWindow = window
         }

@@ -3,13 +3,19 @@ import SwiftUI
 // MARK: - theme
 
 enum Theme: String, CaseIterable, Identifiable {
-    case obsidian, chrome, pearl
+    case glass, obsidian, chrome, pearl
     var id: String { rawValue }
     var label: String { rawValue.capitalized }
 
-    /// The blob's fill. Obsidian is the default: black glass, colour only in halo and seam.
+    /// Glass refracts what is behind the panel instead of painting over it.
+    var isGlass: Bool { self == .glass }
+
+    /// The blob's fill. Glass is the default: a thin tint over the live backdrop.
     @ViewBuilder var fill: some View {
         switch self {
+        case .glass:
+            LinearGradient(colors: [.white.opacity(0.22), .white.opacity(0.04), .white.opacity(0.14)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
         case .chrome:
             LinearGradient(stops: [
                 .init(color: Color(hex: 0xf2f7ff), location: 0.00),
@@ -32,6 +38,7 @@ enum Theme: String, CaseIterable, Identifiable {
         switch self {
         case .chrome: 0.62
         case .pearl: 0.48
+        case .glass: 0.42
         case .obsidian: 0.16
         }
     }
@@ -169,7 +176,9 @@ struct PillView: View {
 
     var body: some View {
         TimelineView(.animation) { timeline in
-            let t = timeline.date.timeIntervalSinceReferenceDate
+            // Freezing t holds the swarm in its resting pose: the blob still answers your
+            // voice through `amp`, it just stops orbiting.
+            let t = engine.calmMotion ? 0 : timeline.date.timeIntervalSinceReferenceDate
             let st = engine.state
             let amp = engine.amp
             let goo = Goo(t: t, amp: amp, core: engine.core, sat: engine.sat, speed: st.speed)
@@ -183,17 +192,75 @@ struct PillView: View {
                     .scaleEffect(1.14 + 0.14 * amp)
                     .opacity(st.lift * (0.55 + 0.45 * amp))
 
+                // Glass refracts the desktop behind the panel; the other themes are opaque
+                // paint, so the material would only muddy them.
+                if engine.theme.isGlass {
+                    Rectangle().fill(.ultraThinMaterial).mask(goo)
+                    halo.opacity(0.3 + 0.35 * amp).mask(goo).blendMode(.plusLighter)
+                }
+
                 engine.theme.fill
                     .mask(goo)
+
+                if engine.theme.isGlass {
+                    rim(st, goo: goo, amp: amp)
+                    specular(amp: amp)
+                }
 
                 seam(st, amp: amp)
             }
             .frame(width: 220, height: 120)
-            .drawingGroup()
+            // drawingGroup() would rasterise the material and lose the backdrop.
+            .compositingGroup()
         }
         .contentShape(Rectangle())
         .onTapGesture { engine.toggle() }
         .help(engine.state.caption)
+        .overlay(alignment: .topTrailing) { cancelButton }
+    }
+
+    /// Only offered while there is something to throw away.
+    @ViewBuilder private var cancelButton: some View {
+        if engine.state == .recording || engine.state == .transcribing {
+            Button { engine.cancel() } label: {
+                Image(systemName: "xmark")
+                    .font(.system(size: 9, weight: .bold))
+                    .foregroundStyle(.white.opacity(0.85))
+                    .frame(width: 18, height: 18)
+                    .background(.black.opacity(0.45), in: Circle())
+                    .overlay(Circle().strokeBorder(.white.opacity(0.25)))
+            }
+            .buttonStyle(.plain)
+            .padding(6)
+            .help("Discard this take")
+            .transition(.opacity)
+        }
+    }
+
+    /// A lit edge around the whole shape: the goo filled with a light gradient, with a
+    /// slightly smaller copy punched out of the middle.
+    private func rim(_ st: PillState, goo: some View, amp: Double) -> some View {
+        ZStack {
+            LinearGradient(colors: [.white.opacity(0.9), st.c1.opacity(0.55), .white.opacity(0.28)],
+                           startPoint: .topLeading, endPoint: .bottomTrailing)
+                .mask(goo)
+            Color.black
+                .mask(goo.scaleEffect(0.955))
+                .blendMode(.destinationOut)
+        }
+        .compositingGroup()
+        .opacity(0.5 + 0.4 * amp)
+    }
+
+    /// The tight highlight that sells a curved, wet surface.
+    private func specular(amp: Double) -> some View {
+        let d = engine.core * (0.92 + 0.3 * amp)
+        return Ellipse()
+            .fill(.white)
+            .frame(width: d * 0.3, height: d * 0.19)
+            .blur(radius: 3)
+            .opacity(0.75)
+            .offset(x: -d * 0.2, y: -d * 0.26)
     }
 
     /// The iridescent seam plus the top gloss — never gooed, so they stay crisp.
@@ -254,6 +321,14 @@ func runSelfTest() {
     for blob in loud {
         assert(abs(blob.x) + blob.r <= 110 && abs(blob.y) + blob.r <= 60, "blob escapes the panel")
     }
+
+    // Model substitution: prefer the best downloaded model at or below what was asked for,
+    // and only reach upward when there is nothing below.
+    assert(fallbackModel(for: "small", from: ["small", "tiny"]) == "small", "downloaded model must win")
+    assert(fallbackModel(for: "large-v3_turbo", from: ["tiny", "base", "small"]) == "small")
+    assert(fallbackModel(for: "tiny", from: ["medium"]) == "medium", "reach up when nothing is below")
+    assert(fallbackModel(for: "small", from: []) == nil, "nothing downloaded means nothing to use")
+    assert(fallbackModel(for: "small", from: ["nonsense"]) == nil, "unknown names are not candidates")
 
     print("selftest ok")
 }

@@ -25,14 +25,27 @@ final class Updater: ObservableObject {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
     }
 
+    @Published var lastChecked: Date?
+
     private var checkTimer: Timer?
 
-    /// Check on launch and once a day after that.
+    /// Check shortly after launch and every four hours after that, so the Settings pane is
+    /// already current whenever it is opened.
     func startPeriodicChecks() {
         Task { await check(quietly: true) }
-        checkTimer = Timer.scheduledTimer(withTimeInterval: 86_400, repeats: true) { [weak self] _ in
+        checkTimer = Timer.scheduledTimer(withTimeInterval: 4 * 3_600, repeats: true) { [weak self] _ in
             Task { @MainActor in await self?.check(quietly: true) }
         }
+    }
+
+    /// "just now" / "2h ago" — enough to show the checking is really happening.
+    var lastCheckedDescription: String? {
+        guard let lastChecked else { return nil }
+        let seconds = Date().timeIntervalSince(lastChecked)
+        if seconds < 90 { return "checked just now" }
+        let formatter = RelativeDateTimeFormatter()
+        formatter.unitsStyle = .short
+        return "checked \(formatter.localizedString(for: lastChecked, relativeTo: Date()))"
     }
 
     func check(quietly: Bool = false) async {
@@ -46,6 +59,7 @@ final class Updater: ObservableObject {
             // A repo with no releases yet 404s — that is not an error worth showing.
             if let http = response as? HTTPURLResponse, http.statusCode == 404 {
                 status = .upToDate
+                lastChecked = Date()
                 return
             }
             let release = try JSONDecoder().decode(Release.self, from: data)
@@ -54,9 +68,10 @@ final class Updater: ObservableObject {
             guard latest.compare(currentVersion, options: .numeric) == .orderedDescending,
                   let asset = release.assets.first(where: { $0.name.hasSuffix(".zip") }),
                   let assetURL = URL(string: asset.browser_download_url)
-            else { status = .upToDate; return }
+            else { status = .upToDate; lastChecked = Date(); return }
 
             status = .available(version: latest, url: assetURL)
+            lastChecked = Date()
         } catch {
             status = quietly ? .idle : .failed(error.localizedDescription)
         }

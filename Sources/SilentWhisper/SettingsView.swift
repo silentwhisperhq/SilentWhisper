@@ -8,12 +8,22 @@ let availableModels = ["tiny", "base", "small", "medium", "large-v3_turbo", "bas
 /// Which models are already on disk, so the picker can mark them and you know which
 /// choices are instant and which mean a download plus a long first compile.
 var downloadedModels: Set<String> {
-    let base = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
-        .appendingPathComponent("huggingface/models/argmaxinc/whisperkit-coreml")
-    let folders = (try? FileManager.default.contentsOfDirectory(atPath: base.path)) ?? []
+    let folders = (try? FileManager.default.contentsOfDirectory(atPath: modelCache.path)) ?? []
     return Set(folders.compactMap { folder in
         folder.hasPrefix("openai_whisper-") ? String(folder.dropFirst("openai_whisper-".count)) : nil
     })
+}
+
+private var modelCache: URL {
+    FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0]
+        .appendingPathComponent("huggingface/models/argmaxinc/whisperkit-coreml")
+}
+
+/// WhisperKit cannot find an already-downloaded model from its name alone — it needs the
+/// folder, or it tries to fetch and fails when downloads are off.
+func localModelFolder(_ name: String) -> URL? {
+    let url = modelCache.appendingPathComponent("openai_whisper-\(name)")
+    return FileManager.default.fileExists(atPath: url.path) ? url : nil
 }
 
 /// A short list rather than all 99 Whisper languages — auto-detect covers the rest.
@@ -30,6 +40,7 @@ struct SettingsView: View {
     @AppStorage("model") private var model = "small"
     @AppStorage("language") private var language = "auto"
     @AppStorage("autoPaste") private var autoPaste = true
+    @AppStorage("reducedMotion") private var reducedMotion = "system"
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var trusted = AXIsProcessTrusted()
 
@@ -52,9 +63,19 @@ struct SettingsView: View {
                     .foregroundStyle(.secondary)
 
                 switch engine.model {
-                case .downloading(let fraction):
+                case .downloading(let fraction), .substituting(_, _, let fraction):
                     VStack(alignment: .leading, spacing: 4) {
-                        ProgressView(value: fraction)
+                        HStack(spacing: 8) {
+                            ProgressView(value: fraction)
+                            Button {
+                                engine.cancelModelDownload()
+                            } label: {
+                                Image(systemName: "xmark.circle.fill")
+                            }
+                            .buttonStyle(.borderless)
+                            .foregroundStyle(.secondary)
+                            .help("Stop downloading")
+                        }
                         Text(engine.model.label)
                             .font(.caption)
                             .foregroundStyle(.secondary)
@@ -66,8 +87,8 @@ struct SettingsView: View {
                             Text(engine.model.label).foregroundStyle(.secondary)
                         }
                     }
-                case .ready:
-                    LabeledContent("Status") { Text("Ready").foregroundStyle(.green) }
+                case .ready(let name):
+                    LabeledContent("Status") { Text("Ready — \(name)").foregroundStyle(.green) }
                 case .failed(let why):
                     LabeledContent("Status") { Text(why).foregroundStyle(.red) }
                 }
@@ -87,6 +108,19 @@ struct SettingsView: View {
                     ForEach(Theme.allCases) { Text($0.label).tag($0) }
                 }
                 .pickerStyle(.segmented)
+
+                Picker("Motion", selection: $reducedMotion) {
+                    Text("Match system").tag("system")
+                    Text("Reduced").tag("on")
+                    Text("Full").tag("off")
+                }
+                .onChange(of: reducedMotion) { engine.refreshMotionPreference() }
+
+                Text(engine.calmMotion
+                     ? "The blob still responds to your voice, but stops orbiting and pulsing."
+                     : "The satellites orbit and the blob breathes while it works.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section {
@@ -145,15 +179,35 @@ struct SettingsView: View {
                             Button("Retry") { Task { await updater.check() } }
                         }
                     case .upToDate, .idle:
-                        HStack(spacing: 8) {
-                            Text(updater.currentVersion).foregroundStyle(.secondary)
-                            Button("Check") { Task { await updater.check() } }
-                        }
+                        Text(updater.currentVersion).foregroundStyle(.secondary)
                     }
+                }
+
+                if case .upToDate = updater.status {
+                    Label("You're on the latest version", systemImage: "checkmark.circle.fill")
+                        .font(.caption)
+                        .foregroundStyle(.green)
+                }
+                if let checked = updater.lastCheckedDescription {
+                    Text("Updates install themselves — \(checked).")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+
+                HStack(spacing: 6) {
+                    Text("BETA")
+                        .font(.system(size: 9, weight: .bold))
+                        .padding(.horizontal, 5).padding(.vertical, 2)
+                        .background(.orange.opacity(0.22), in: Capsule())
+                        .foregroundStyle(.orange)
+                    Text("built by Claude")
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
                 }
             }
         }
         .formStyle(.grouped)
+        .scrollContentBackground(.hidden)   // let the window's blur show through
         .frame(width: 400)
         .fixedSize(horizontal: false, vertical: true)
         .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) {
