@@ -179,17 +179,20 @@ struct SettingsView: View {
                             Button("Retry") { Task { await updater.check() } }
                         }
                     case .upToDate, .idle:
-                        Text(updater.currentVersion).foregroundStyle(.secondary)
+                        HStack(spacing: 8) {
+                            Text(updater.currentVersion).foregroundStyle(.secondary)
+                            Button("Check") { Task { await updater.check() } }
+                        }
                     }
                 }
 
-                if case .upToDate = updater.status {
+                if updater.justChecked, case .upToDate = updater.status {
                     Label("You're on the latest version", systemImage: "checkmark.circle.fill")
                         .font(.caption)
                         .foregroundStyle(.green)
-                }
-                if let checked = updater.lastCheckedDescription {
-                    Text("Updates install themselves — \(checked).")
+                        .transition(.opacity)
+                } else {
+                    Text("Checks for updates automatically every few hours.")
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }

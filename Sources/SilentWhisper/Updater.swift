@@ -27,7 +27,12 @@ final class Updater: ObservableObject {
 
     @Published var lastChecked: Date?
 
+    /// Set only by a check the user asked for, and cleared a few seconds later — the
+    /// confirmation is feedback for that click, not a permanent status line.
+    @Published var justChecked = false
+
     private var checkTimer: Timer?
+    private var noteTask: Task<Void, Never>?
 
     /// Check shortly after launch and every four hours after that, so the Settings pane is
     /// already current whenever it is opened.
@@ -35,6 +40,16 @@ final class Updater: ObservableObject {
         Task { await check(quietly: true) }
         checkTimer = Timer.scheduledTimer(withTimeInterval: 4 * 3_600, repeats: true) { [weak self] _ in
             Task { @MainActor in await self?.check(quietly: true) }
+        }
+    }
+
+    private func flashCheckedNote() {
+        justChecked = true
+        noteTask?.cancel()
+        noteTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(5))
+            guard !Task.isCancelled else { return }
+            self?.justChecked = false
         }
     }
 
@@ -49,7 +64,13 @@ final class Updater: ObservableObject {
     }
 
     func check(quietly: Bool = false) async {
-        if !quietly { status = .checking }
+        if !quietly {
+            status = .checking
+            justChecked = false
+        }
+        defer {
+            if !quietly { flashCheckedNote() }
+        }
         do {
             let url = URL(string: "https://api.github.com/repos/\(Self.repo)/releases/latest")!
             var request = URLRequest(url: url)
