@@ -119,8 +119,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
                                            accessibilityDescription: "Silent Whisper")
 
         let menu = NSMenu()
-        menu.addItem(withTitle: "Silent Whisper \(updater.currentVersion) beta · by Claude",
-                     action: nil, keyEquivalent: "")
+        let banner = Updater.isDevBuild
+            ? "Silent Whisper \(updater.currentVersion) beta · by Claude"
+            : "Silent Whisper \(updater.currentVersion)"
+        menu.addItem(withTitle: banner, action: nil, keyEquivalent: "")
         menu.addItem(withTitle: "Hold right ⌥ to talk", action: nil, keyEquivalent: "")
         menu.addItem(.separator())
 

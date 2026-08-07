@@ -7,6 +7,10 @@ CONFIG=${1:-release}
 APP="SilentWhisper.app"
 VERSION=$(cat VERSION)
 
+# Builds handed straight to a machine get a "beta · by Claude" marker so they are
+# distinguishable from a real download. release.sh sets SW_RELEASE to turn it off.
+DEV_BUILD=$([ -n "${SW_RELEASE:-}" ] && echo false || echo true)
+
 [ -f AppIcon.icns ] || ./makeicon.sh
 
 swift build -c "$CONFIG"
@@ -31,6 +35,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleIdentifier</key>        <string>com.nuh.silentwhisper</string>
   <key>CFBundlePackageType</key>       <string>APPL</string>
   <key>CFBundleIconFile</key>          <string>AppIcon</string>
+  <key>SWDevBuild</key>                <$DEV_BUILD/>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key>           <string>$VERSION</string>
   <key>LSMinimumSystemVersion</key>    <string>14.0</string>

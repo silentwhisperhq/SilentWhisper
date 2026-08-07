@@ -197,15 +197,17 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
-                HStack(spacing: 6) {
-                    Text("BETA")
-                        .font(.system(size: 9, weight: .bold))
-                        .padding(.horizontal, 5).padding(.vertical, 2)
-                        .background(.orange.opacity(0.22), in: Capsule())
-                        .foregroundStyle(.orange)
-                    Text("built by Claude")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
+                if Updater.isDevBuild {
+                    HStack(spacing: 6) {
+                        Text("BETA")
+                            .font(.system(size: 9, weight: .bold))
+                            .padding(.horizontal, 5).padding(.vertical, 2)
+                            .background(.orange.opacity(0.22), in: Capsule())
+                            .foregroundStyle(.orange)
+                        Text("built by Claude")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    }
                 }
             }
         }

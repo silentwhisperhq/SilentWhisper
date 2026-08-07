@@ -25,6 +25,11 @@ final class Updater: ObservableObject {
         Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0"
     }
 
+    /// True only for a build installed directly rather than downloaded from a release.
+    static var isDevBuild: Bool {
+        Bundle.main.object(forInfoDictionaryKey: "SWDevBuild") as? Bool ?? false
+    }
+
     @Published var lastChecked: Date?
 
     /// Set only by a check the user asked for, and cleared a few seconds later — the

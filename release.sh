@@ -6,7 +6,7 @@ cd "$(dirname "$0")"
 VERSION=${1:?usage: ./release.sh <version>}
 echo "$VERSION" > VERSION
 
-./build.sh release
+SW_RELEASE=1 ./build.sh release
 
 ZIP="SilentWhisper-$VERSION.zip"
 rm -f "$ZIP"
