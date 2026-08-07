@@ -189,6 +189,12 @@ final class Engine: ObservableObject {
         } else if onDisk.contains(wanted) {
             model = .warming
             await activate(wanted, reportingAs: wanted)
+            // Weights can still be corrupt in ways only CoreML sees. Fall back rather than
+            // leave the app with no model at all.
+            if whisper == nil, !Task.isCancelled,
+               let stand = fallbackModel(for: wanted, from: onDisk.subtracting([wanted])) {
+                await activate(stand, reportingAs: stand)
+            }
         } else {
             await fetchAndActivate(wanted, standingIn: nil)
         }

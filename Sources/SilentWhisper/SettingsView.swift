@@ -9,9 +9,21 @@ let availableModels = ["tiny", "base", "small", "medium", "large-v3_turbo", "bas
 /// choices are instant and which mean a download plus a long first compile.
 var downloadedModels: Set<String> {
     let folders = (try? FileManager.default.contentsOfDirectory(atPath: modelCache.path)) ?? []
-    return Set(folders.compactMap { folder in
-        folder.hasPrefix("openai_whisper-") ? String(folder.dropFirst("openai_whisper-".count)) : nil
+    return Set(folders.compactMap { folder -> String? in
+        guard folder.hasPrefix("openai_whisper-"),
+              isModelComplete(modelCache.appendingPathComponent(folder))
+        else { return nil }
+        return String(folder.dropFirst("openai_whisper-".count))
     })
+}
+
+/// An interrupted download leaves the folder in place with its weights missing, and CoreML
+/// only notices at load time. A model counts as present only when every weight file is there.
+func isModelComplete(_ folder: URL) -> Bool {
+    ["AudioEncoder", "MelSpectrogram", "TextDecoder"].allSatisfy { part in
+        FileManager.default.fileExists(
+            atPath: folder.appendingPathComponent("\(part).mlmodelc/weights/weight.bin").path)
+    }
 }
 
 private var modelCache: URL {
@@ -23,7 +35,7 @@ private var modelCache: URL {
 /// folder, or it tries to fetch and fails when downloads are off.
 func localModelFolder(_ name: String) -> URL? {
     let url = modelCache.appendingPathComponent("openai_whisper-\(name)")
-    return FileManager.default.fileExists(atPath: url.path) ? url : nil
+    return isModelComplete(url) ? url : nil
 }
 
 /// A short list rather than all 99 Whisper languages — auto-detect covers the rest.
