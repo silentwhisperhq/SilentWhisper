@@ -1,0 +1,403 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Silent Whisper — push-to-talk dictation for macOS</title>
+<meta name="description" content="Hold a key, talk, and the text lands where your cursor already is. Speech to text that runs entirely on your Mac.">
+<meta property="og:title" content="Silent Whisper">
+<meta property="og:description" content="Push-to-talk dictation for macOS. Runs on your Mac. No account, no subscription.">
+<meta property="og:image" content="https://notnaki.github.io/silent-whisper/blob.png">
+<meta name="theme-color" content="#06070b">
+<link rel="icon" href="blob.png">
+<style>
+:root {
+  --bg: #06070b;
+  --raised: #0c0e14;
+  --line: #ffffff14;
+  --ink: #eef1f7;
+  --muted: #8b93a3;
+  --cyan: #00d8ff;
+  --violet: #6a5cff;
+  --radius: 16px;
+}
+* { box-sizing: border-box; margin: 0; padding: 0 }
+html { scroll-behavior: smooth }
+body {
+  background: var(--bg);
+  color: var(--ink);
+  font: 400 17px/1.6 ui-sans-serif, -apple-system, BlinkMacSystemFont, "SF Pro Text", system-ui, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  overflow-x: hidden;
+}
+.wrap { width: min(1120px, 100% - 48px); margin-inline: auto }
+a { color: inherit }
+h1, h2, h3 { letter-spacing: -0.033em; line-height: 1.05; font-weight: 600 }
+h2 { font-size: clamp(30px, 4vw, 46px) }
+p { color: var(--muted) }
+.lead { font-size: 19px; max-width: 46ch }
+
+/* ---------- nav ---------- */
+nav {
+  position: sticky; top: 0; z-index: 40; height: 68px;
+  display: flex; align-items: center;
+  background: color-mix(in srgb, var(--bg) 82%, transparent);
+  backdrop-filter: blur(18px);
+  border-bottom: 1px solid transparent;
+  transition: border-color .3s;
+}
+nav.stuck { border-bottom-color: var(--line) }
+nav .wrap { display: flex; align-items: center; justify-content: space-between; gap: 24px }
+.brand { display: flex; align-items: center; gap: 10px; font-weight: 600; letter-spacing: -0.02em; text-decoration: none }
+.mark { width: 22px; height: 22px; border-radius: 50%; position: relative;
+  background: radial-gradient(circle at 34% 26%, #23262f, #05060a 70%); flex: none }
+.mark::after { content: ""; position: absolute; left: 8%; right: 8%; top: 50%; height: 2px;
+  transform: translateY(-50%); border-radius: 9px; filter: blur(.6px);
+  background: linear-gradient(90deg, transparent, var(--cyan), #fff, var(--violet), transparent) }
+.nav-links { display: flex; align-items: center; gap: 28px; font-size: 15px }
+.nav-links a { color: var(--muted); text-decoration: none; transition: color .2s }
+.nav-links a:hover { color: var(--ink) }
+@media (max-width: 720px) { .nav-links a:not(.btn) { display: none } }
+
+/* ---------- buttons ---------- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 9px;
+  height: 46px; padding: 0 22px; border-radius: 999px;
+  font-size: 15px; font-weight: 550; white-space: nowrap; text-decoration: none;
+  border: 1px solid transparent; cursor: pointer;
+  transition: transform .18s cubic-bezier(.2,.9,.3,1), background .2s, border-color .2s;
+}
+.btn:active { transform: translateY(1px) scale(.985) }
+.btn-primary { background: var(--ink); color: #07080c }
+.btn-primary:hover { background: #fff }
+.btn-ghost { border-color: #ffffff26; color: var(--ink) }
+.btn-ghost:hover { border-color: #ffffff4d; background: #ffffff0d }
+nav .btn { height: 38px; padding: 0 16px }
+
+/* ---------- hero ---------- */
+.hero { padding: clamp(56px, 9vw, 96px) 0 clamp(64px, 10vw, 120px) }
+.hero .wrap { display: grid; grid-template-columns: 1.05fr .95fr; gap: 56px; align-items: center }
+.hero h1 { font-size: clamp(44px, 6.4vw, 78px) }
+.tint { background: linear-gradient(96deg, var(--cyan), var(--violet));
+  -webkit-background-clip: text; background-clip: text; color: transparent }
+.hero .lead { margin-top: 22px }
+.cta { display: flex; gap: 12px; margin-top: 34px; flex-wrap: wrap }
+@media (max-width: 900px) {
+  .hero .wrap { grid-template-columns: 1fr; gap: 40px }
+  .stage { order: -1 }
+}
+
+/* ---------- the blob (the app's own UI, same shapes and colours) ---------- */
+.stage {
+  position: relative; aspect-ratio: 4 / 3; border-radius: 22px; overflow: hidden;
+  display: grid; place-items: center; cursor: pointer;
+  border: 1px solid var(--line);
+  background:
+    radial-gradient(58% 88% at 18% 22%, #3a2a6b55, transparent 70%),
+    radial-gradient(50% 80% at 84% 76%, #0d3f6b55, transparent 70%),
+    linear-gradient(158deg, #14161f, #08090e);
+}
+.rig { position: relative; width: 220px; height: 120px; z-index: 2; transform: scale(1.12) }
+.layer { position: absolute; inset: 0 }
+.layer b { position: absolute; left: 50%; top: 50%; display: block; border-radius: 50%;
+  transition: width .5s cubic-bezier(.2,.9,.3,1), height .5s cubic-bezier(.2,.9,.3,1),
+              margin .5s cubic-bezier(.2,.9,.3,1) }
+[data-state=idle]  { --c1: #8a93a5; --c2: #5c6474; --lift: .26; --spd: 1 }
+[data-state=rec]   { --c1: #00d8ff; --c2: #6a5cff; --lift: 1;   --spd: 1 }
+[data-state=think] { --c1: #ffb03a; --c2: #ff4fa3; --lift: .9;  --spd: .34 }
+[data-state=ai]    { --c1: #a06bff; --c2: #54e0ff; --lift: .95; --spd: .34 }
+[data-state=done]  { --c1: #3ce87a; --c2: #9fffc4; --lift: .75; --spd: 1.6 }
+.stage { --amp: 0 }
+.aura { filter: blur(15px); opacity: calc(var(--lift) * (.55 + .45 * var(--amp)));
+  transform: scale(calc(1.14 + .14 * var(--amp))) }
+.aura b { background: var(--c1) }
+.aura b:nth-child(even) { background: var(--c2) }
+.body-l { filter: url(#goo) }
+.body-l b { background: radial-gradient(circle at 34% 26%, #23262f, #05060a 72%) }
+.m { width: 20px; height: 20px; margin: -10px 0 0 -10px; transform: scale(calc(.92 + .3 * var(--amp))) }
+[data-state=rec] .m, [data-state=rec] .shine { width: 44px; height: 44px; margin: -22px 0 0 -22px }
+[data-state=think] .m, [data-state=think] .shine { width: 36px; height: 36px; margin: -18px 0 0 -18px }
+[data-state=ai] .m, [data-state=ai] .shine { width: 34px; height: 34px; margin: -17px 0 0 -17px }
+[data-state=done] .m, [data-state=done] .shine { width: 30px; height: 30px; margin: -15px 0 0 -15px }
+.shine { position: absolute; left: 50%; top: 50%; pointer-events: none;
+  width: 20px; height: 20px; margin: -10px 0 0 -10px; border-radius: 50%;
+  transform: scale(calc(.92 + .3 * var(--amp)));
+  transition: width .5s cubic-bezier(.2,.9,.3,1), height .5s cubic-bezier(.2,.9,.3,1), margin .5s cubic-bezier(.2,.9,.3,1) }
+.shine::before { content: ""; position: absolute; left: 6%; right: 6%; top: 50%; height: 3px;
+  transform: translateY(-50%) scaleX(calc(.55 + .5 * var(--amp)));
+  border-radius: 999px; filter: blur(2.2px); opacity: calc(var(--lift) * (.6 + .4 * var(--amp)));
+  background: linear-gradient(90deg, transparent, var(--c1) 20%, #fff 50%, var(--c2) 80%, transparent);
+  box-shadow: 0 0 18px color-mix(in srgb, var(--c1) 80%, transparent) }
+.shine::after { content: ""; position: absolute; inset: 8% 18% 58%; border-radius: 50%;
+  background: linear-gradient(180deg, #ffffff30, transparent) }
+.s { width: 0; height: 0; margin: 0 }
+[data-state=rec] .s, [data-state=think] .s, [data-state=ai] .s, [data-state=done] .s { width: 14px; height: 14px }
+.s1 { margin: -22px 0 0 -40px; animation: swarm calc(2.4s * var(--spd)) ease-in-out infinite }
+.s2 { margin: 8px 0 0 -33px;   animation: swarm calc(3.1s * var(--spd)) ease-in-out infinite .3s }
+.s3 { margin: -27px 0 0 9px;   animation: swarm calc(2.7s * var(--spd)) ease-in-out infinite .6s }
+.s4 { margin: 10px 0 0 22px;   animation: swarm calc(3.6s * var(--spd)) ease-in-out infinite .9s }
+.s5 { margin: -9px 0 0 38px;   animation: swarm calc(2.9s * var(--spd)) ease-in-out infinite 1.2s }
+.s6 { margin: 2px 0 0 -52px;   animation: swarm calc(3.3s * var(--spd)) ease-in-out infinite 1.5s }
+@keyframes swarm {
+  0%, 100% { transform: scale(calc(.35 + .5 * var(--amp))) translate(0, 0) }
+  50%      { transform: scale(calc(.8 + .85 * var(--amp))) translate(-7px, 5px) }
+}
+.tag { position: absolute; bottom: 16px; left: 0; right: 0; text-align: center;
+  font: 500 11px ui-monospace, SFMono-Regular, monospace; letter-spacing: .1em;
+  text-transform: uppercase; color: #6b7486 }
+.hint { position: absolute; top: 16px; right: 18px; font-size: 11.5px; color: #5b6375 }
+
+/* ---------- sections ---------- */
+section { padding: clamp(72px, 10vw, 128px) 0 }
+.eyebrow { font: 500 11px ui-monospace, SFMono-Regular, monospace; letter-spacing: .16em;
+  text-transform: uppercase; color: #6b7486; margin-bottom: 18px }
+
+/* states row */
+.states { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-top: 44px }
+.state-card { border: 1px solid var(--line); border-radius: var(--radius); padding: 22px 20px;
+  background: linear-gradient(180deg, #ffffff09, #ffffff03) }
+.state-card .dotline { height: 3px; width: 44px; border-radius: 9px; margin-bottom: 18px }
+.state-card h3 { font-size: 16px; margin-bottom: 7px }
+.state-card p { font-size: 14.5px; line-height: 1.55 }
+@media (max-width: 860px) { .states { grid-template-columns: repeat(2, 1fr) } }
+@media (max-width: 480px) { .states { grid-template-columns: 1fr } }
+
+/* privacy statement */
+.statement { border-top: 1px solid var(--line); border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, #00d8ff08, transparent 60%) }
+.statement h2 { max-width: 20ch }
+.statement .lead { margin-top: 24px; font-size: 20px; max-width: 58ch }
+
+/* split with screenshot */
+.split { display: grid; grid-template-columns: 1fr 1fr; gap: 64px; align-items: center }
+.split img { width: 100%; max-width: 420px; border-radius: 18px; display: block;
+  border: 1px solid var(--line); box-shadow: 0 40px 90px #00000080 }
+.notes { margin-top: 30px; display: grid; gap: 20px }
+.note { padding-left: 18px; border-left: 2px solid #ffffff1f }
+.note strong { display: block; font-weight: 550; margin-bottom: 5px; font-size: 15.5px }
+.note span { color: var(--muted); font-size: 14.5px }
+@media (max-width: 900px) { .split { grid-template-columns: 1fr; gap: 40px } }
+
+/* install */
+.steps { counter-reset: s; margin-top: 46px; display: grid; gap: 2px }
+.step { counter-increment: s; display: grid; grid-template-columns: 44px 1fr; gap: 20px;
+  padding: 26px 0; border-top: 1px solid var(--line); align-items: start }
+.step:last-child { border-bottom: 1px solid var(--line) }
+.step::before { content: counter(s, decimal-leading-zero);
+  font: 500 12px ui-monospace, SFMono-Regular, monospace; color: #5b6375; padding-top: 4px }
+.step h3 { font-size: 18px; margin-bottom: 8px }
+.step p { font-size: 15px; max-width: 62ch }
+code { font: 13.5px ui-monospace, SFMono-Regular, monospace; background: #ffffff0f;
+  border: 1px solid var(--line); border-radius: 7px; padding: 2.5px 7px; color: #cdd4e0 }
+
+/* footer */
+footer { border-top: 1px solid var(--line); padding: 44px 0 60px }
+footer .wrap { display: flex; justify-content: space-between; gap: 24px; flex-wrap: wrap;
+  align-items: center; font-size: 14.5px; color: var(--muted) }
+footer a { color: var(--muted); text-decoration: none }
+footer a:hover { color: var(--ink) }
+
+/* reveal */
+.reveal { opacity: 0; transform: translateY(22px); transition: opacity .7s cubic-bezier(.16,1,.3,1), transform .7s cubic-bezier(.16,1,.3,1) }
+.reveal.in { opacity: 1; transform: none }
+@media (prefers-reduced-motion: reduce) {
+  html { scroll-behavior: auto }
+  .reveal { opacity: 1; transform: none; transition: none }
+  .s1, .s2, .s3, .s4, .s5, .s6 { animation: none }
+  .btn { transition: none }
+}
+</style>
+</head>
+<body>
+
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <filter id="goo">
+    <feGaussianBlur in="SourceGraphic" stdDeviation="6" result="b"/>
+    <feColorMatrix in="b" values="1 0 0 0 0  0 1 0 0 0  0 0 1 0 0  0 0 0 26 -12"/>
+  </filter>
+</svg>
+
+<nav id="nav">
+  <div class="wrap">
+    <a class="brand" href="#top"><span class="mark"></span> Silent Whisper</a>
+    <div class="nav-links">
+      <a href="#how">How it works</a>
+      <a href="#privacy">Privacy</a>
+      <a href="#install">Install</a>
+      <a class="btn btn-ghost" href="https://github.com/notnaki/silent-whisper">GitHub</a>
+    </div>
+  </div>
+</nav>
+
+<header class="hero" id="top">
+  <div class="wrap">
+    <div>
+      <h1>Talk.<br>It <span class="tint">types.</span></h1>
+      <p class="lead">Hold a key, say what you mean, and the words land where your cursor already is.</p>
+      <div class="cta">
+        <a class="btn btn-primary" href="https://github.com/notnaki/silent-whisper/releases/latest">Download for macOS</a>
+        <a class="btn btn-ghost" href="https://github.com/notnaki/silent-whisper">View source</a>
+      </div>
+    </div>
+
+    <div class="stage" data-state="rec" id="stage" role="img"
+         aria-label="The Silent Whisper blob, reacting to speech while it listens">
+      <div class="rig">
+        <div class="layer aura">
+          <b class="m"></b><b class="s s1"></b><b class="s s2"></b><b class="s s3"></b><b class="s s4"></b><b class="s s5"></b><b class="s s6"></b>
+        </div>
+        <div class="layer body-l">
+          <b class="m"></b><b class="s s1"></b><b class="s s2"></b><b class="s s3"></b><b class="s s4"></b><b class="s s5"></b><b class="s s6"></b>
+        </div>
+        <div class="shine"></div>
+      </div>
+      <span class="hint">click to change state</span>
+      <span class="tag" id="tag">listening</span>
+    </div>
+  </div>
+</header>
+
+<section id="how">
+  <div class="wrap reveal">
+    <p class="eyebrow">How it works</p>
+    <h2>One key. Four states.<br>Nothing to click.</h2>
+    <p class="lead" style="margin-top:20px">The blob appears when something is happening and fades out when the text has landed. The rest of the time your screen is your own.</p>
+
+    <div class="states">
+      <div class="state-card">
+        <div class="dotline" style="background:linear-gradient(90deg,#00d8ff,#6a5cff)"></div>
+        <h3>Listening</h3>
+        <p>Hold the right option key. The core swells with your voice so you can see it is hearing you.</p>
+      </div>
+      <div class="state-card">
+        <div class="dotline" style="background:linear-gradient(90deg,#ffb03a,#ff4fa3)"></div>
+        <h3>Transcribing</h3>
+        <p>Whisper runs on the Neural Engine. A few seconds of speech takes well under a second.</p>
+      </div>
+      <div class="state-card">
+        <div class="dotline" style="background:linear-gradient(90deg,#a06bff,#54e0ff)"></div>
+        <h3>Polishing</h3>
+        <p>An optional AI pass fixes punctuation and misheard names. Turn it off and this step vanishes.</p>
+      </div>
+      <div class="state-card">
+        <div class="dotline" style="background:linear-gradient(90deg,#3ce87a,#9fffc4)"></div>
+        <h3>Pasted</h3>
+        <p>The text is copied and pasted into whatever had focus. Then the blob gets out of the way.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="statement" id="privacy">
+  <div class="wrap reveal">
+    <h2>Your voice never leaves the Mac.</h2>
+    <p class="lead">Whisper runs locally on the Neural Engine. There is no account, no subscription, and no server to trust. Turn on the AI pass and only the finished text is sent, to a provider you pick with a key you own. Leave it off and nothing goes anywhere.</p>
+  </div>
+</section>
+
+<section>
+  <div class="wrap split reveal">
+    <div>
+      <h2>Tuned to the way you actually talk.</h2>
+      <div class="notes">
+        <div class="note">
+          <strong>Any language, not just English</strong>
+          <span>Multilingual by default, detected per take. Türkçe, Deutsch, 日本語 and the rest work without changing a setting.</span>
+        </div>
+        <div class="note">
+          <strong>Teach it your vocabulary</strong>
+          <span>Names, product names and acronyms go in one field. It steers Whisper itself, not just the cleanup afterwards.</span>
+        </div>
+        <div class="note">
+          <strong>Bring your own AI, or none</strong>
+          <span>Apple on-device, Anthropic, OpenAI or Google. Keys live in your Keychain. If a pass fails, the plain transcription is pasted anyway.</span>
+        </div>
+      </div>
+    </div>
+    <img src="settings.png" width="490" height="760" loading="lazy"
+         alt="Silent Whisper settings, showing the language, model and AI pass options">
+  </div>
+</section>
+
+<section id="install">
+  <div class="wrap reveal">
+    <p class="eyebrow">Install</p>
+    <h2>Running in about a minute.</h2>
+
+    <div class="steps">
+      <div class="step">
+        <div>
+          <h3>Download and drag across</h3>
+          <p>Grab the <code>.dmg</code> from the releases page and drop Silent Whisper into Applications. It is signed and notarized by Apple, so it opens without a warning.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div>
+          <h3>Allow the microphone and Accessibility</h3>
+          <p>macOS asks on first launch. Accessibility is what lets the hotkey work anywhere and lets the app paste for you.</p>
+        </div>
+      </div>
+      <div class="step">
+        <div>
+          <h3>Hold right <code>⌥</code> and talk</h3>
+          <p>The first run downloads a speech model, and you can keep talking while it does. After that it is instant, and offline.</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="cta" style="margin-top:44px">
+      <a class="btn btn-primary" href="https://github.com/notnaki/silent-whisper/releases/latest">Download for macOS</a>
+      <span style="align-self:center;color:var(--muted);font-size:14.5px">Apple silicon, macOS 14 or later</span>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    <span>Built by <a href="https://github.com/notnaki">notnaki</a> with Claude.</span>
+    <span><a href="https://github.com/notnaki/silent-whisper">Source</a> and <a href="https://github.com/notnaki/silent-whisper/releases">releases</a> on GitHub.</span>
+  </div>
+</footer>
+
+<script>
+const STATES = ["rec", "think", "ai", "done", "idle"];
+const LABEL = { rec: "listening", think: "transcribing", ai: "polishing", done: "pasted", idle: "idle" };
+const stage = document.getElementById("stage");
+const tag = document.getElementById("tag");
+
+stage.addEventListener("click", () => {
+  const next = STATES[(STATES.indexOf(stage.dataset.state) + 1) % STATES.length];
+  stage.dataset.state = next;
+  tag.textContent = LABEL[next];
+});
+
+// A synthetic speech envelope so the blob moves like a voice rather than a metronome.
+const calm = matchMedia("(prefers-reduced-motion: reduce)");
+let amp = 0, t = Math.random() * 100;
+function frame() {
+  t += 0.055;
+  const state = stage.dataset.state;
+  const target =
+      state === "rec"   ? Math.max(0, 0.45 + 0.4 * Math.sin(t) + 0.28 * Math.sin(t * 2.7 + 1))
+    : state === "think" ? 0.3 + 0.25 * Math.sin(t * 3.4)
+    : state === "ai"    ? 0.32 + 0.2 * Math.sin(t * 2.6)
+    : state === "done"  ? 0.2
+    :                     0.1;
+  amp += (Math.min(1, Math.max(0, target)) - amp) * 0.18;
+  stage.style.setProperty("--amp", amp.toFixed(3));
+  requestAnimationFrame(frame);
+}
+if (!calm.matches) frame(); else stage.style.setProperty("--amp", "0.4");
+
+// Reveal on scroll, and a hairline under the nav once it lifts off the hero.
+const io = new IntersectionObserver((entries) => {
+  for (const e of entries) if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target) }
+}, { threshold: 0.15 });
+document.querySelectorAll(".reveal").forEach((el) => io.observe(el));
+
+const nav = document.getElementById("nav");
+new IntersectionObserver(([e]) => nav.classList.toggle("stuck", !e.isIntersecting),
+  { rootMargin: "-69px 0px 0px 0px" }).observe(document.getElementById("top"));
+</script>
+</body>
+</html>
