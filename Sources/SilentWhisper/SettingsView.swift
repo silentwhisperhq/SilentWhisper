@@ -53,6 +53,26 @@ struct SettingsView: View {
     @AppStorage("language") private var language = "auto"
     @AppStorage("autoPaste") private var autoPaste = true
     @AppStorage("reducedMotion") private var reducedMotion = "system"
+    @AppStorage("aiEnabled") private var aiEnabled = false
+    @AppStorage("aiProvider") private var aiProvider = AIProvider.apple.rawValue
+    @AppStorage("aiStyle") private var aiStyle = AIStyle.tidy.rawValue
+    @AppStorage("aiCustomInstruction") private var customInstruction = ""
+    @AppStorage("vocabulary") private var vocabulary = ""
+
+    @EnvironmentObject private var aiPass: AIPass
+
+    /// Held in memory only; the Keychain is the store of record.
+    @State private var apiKey = ""
+
+    private var provider: AIProvider { AIProvider(rawValue: aiProvider) ?? .apple }
+
+    /// Each provider keeps its own model choice, so switching back and forth doesn't lose it.
+    private var aiModel: Binding<String> {
+        Binding(
+            get: { UserDefaults.standard.string(forKey: "aiModel-\(aiProvider)") ?? "" },
+            set: { UserDefaults.standard.set($0, forKey: "aiModel-\(aiProvider)") }
+        )
+    }
     @State private var launchAtLogin = SMAppService.mainApp.status == .enabled
     @State private var trusted = AXIsProcessTrusted()
 
@@ -114,6 +134,61 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.secondary)
                 }
+            }
+
+            Section {
+                Toggle("AI pass", isOn: $aiEnabled)
+                Text("Sends the transcription to an AI to fix punctuation and misheard words. If it fails, the plain transcription is pasted anyway and you get a notification.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                if aiEnabled {
+                    Picker("Provider", selection: $aiProvider) {
+                        ForEach(AIProvider.allCases) { Text($0.label).tag($0.rawValue) }
+                    }
+
+                    Picker("Style", selection: $aiStyle) {
+                        ForEach(AIStyle.allCases) { Text($0.label).tag($0.rawValue) }
+                    }
+
+                    if aiStyle == AIStyle.custom.rawValue {
+                        TextField("Instruction", text: $customInstruction, axis: .vertical)
+                            .lineLimit(2...4)
+                    }
+
+                    if provider.needsKey {
+                        SecureField("API key", text: $apiKey)
+                            .onSubmit { Keychain.set(apiKey, for: provider) }
+                        LabeledContent("Model") {
+                            TextField(provider.defaultModel, text: aiModel)
+                                .multilineTextAlignment(.trailing)
+                        }
+                        Text("Key is stored in your Keychain. Get one at \(provider.keyHint).")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                    } else {
+                        Text("Runs entirely on this Mac — no key, no network, nothing leaves the machine. Needs Apple Intelligence enabled.")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Text("The on-device model is small: it cleans English well, but is unreliable on Türkçe and other languages. For those, a cloud provider is much better.")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+
+                    if let error = aiPass.lastError {
+                        Label(error, systemImage: "exclamationmark.triangle.fill")
+                            .font(.caption)
+                            .foregroundStyle(.orange)
+                    }
+                }
+            }
+
+            Section {
+                TextField("Names and jargon", text: $vocabulary, axis: .vertical)
+                    .lineLimit(1...3)
+                Text("Comma-separated. Nudges both Whisper and the AI pass toward spellings it keeps getting wrong — names, product names, acronyms.")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
             }
 
             Section {
@@ -223,7 +298,13 @@ struct SettingsView: View {
         // Capped rather than sized-to-fit: the form has outgrown any screen it would have to
         // sit on, so the overflow scrolls instead of stretching the window.
         .frame(width: 400, height: 620)
-        .onAppear { onDisk = downloadedModels }
+        .onAppear {
+            onDisk = downloadedModels
+            apiKey = Keychain.get(provider) ?? ""
+        }
+        // Load the key for whichever provider is now selected, and persist edits as they happen.
+        .onChange(of: aiProvider) { apiKey = Keychain.get(provider) ?? "" }
+        .onChange(of: apiKey) { Keychain.set(apiKey, for: provider) }
         .onChange(of: engine.model) { onDisk = downloadedModels }
         .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) {
             _ in trusted = AXIsProcessTrusted()   // no notification for this; poll while the window is open

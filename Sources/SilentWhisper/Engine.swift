@@ -1,12 +1,14 @@
 import AVFoundation
 import AppKit
 import SwiftUI
+import UserNotifications
 import WhisperKit
 
 enum PillState: Equatable {
     case idle
     case recording
     case transcribing
+    case polishing          // the optional AI pass
     case done
     case failed(String)
 }
@@ -333,17 +335,41 @@ final class Engine: ObservableObject {
         }
         do {
             let language = Engine.language
+            // Seeding the decoder with your own names and jargon fixes them at the source,
+            // before the AI pass ever has to guess at them.
+            let vocab = AIPass.vocabulary.trimmingCharacters(in: .whitespacesAndNewlines)
+            let prompt = vocab.isEmpty ? nil : whisper.tokenizer?.encode(text: " \(vocab)").filter { $0 < 50_257 }
+
             let results = try await whisper.transcribe(audioArray: audio, decodeOptions: DecodingOptions(
                 task: .transcribe,
                 language: language,
+                usePrefillPrompt: prompt != nil,
                 detectLanguage: language == nil,
                 skipSpecialTokens: true,
-                withoutTimestamps: true
+                withoutTimestamps: true,
+                promptTokens: prompt
             ))
             let text = results.map(\.text).joined(separator: " ")
                 .trimmingCharacters(in: .whitespacesAndNewlines)
             guard !text.isEmpty else { state = .idle; return }
-            Paster.deliver(text)
+
+            // The AI pass is a bonus, never a gate: if it fails for any reason — offline,
+            // no credit, bad key, slow — the raw transcription is pasted anyway and the
+            // failure is reported separately.
+            var final = text
+            if AIPass.isEnabled {
+                state = .polishing
+                do {
+                    final = try await AIPass.shared.clean(text)
+                    AIPass.shared.lastError = nil
+                } catch {
+                    AIPass.shared.lastError = error.localizedDescription
+                    Notifier.aiPassFailed(error.localizedDescription)
+                }
+            }
+            guard !Task.isCancelled else { return }
+
+            Paster.deliver(final)
             state = .done
             resetSoon(after: 1.1)
         } catch {
@@ -361,6 +387,24 @@ final class Engine: ObservableObject {
         idleTimer?.invalidate()
         idleTimer = Timer.scheduledTimer(withTimeInterval: t, repeats: false) { [weak self] _ in
             Task { @MainActor in self?.state = .idle }
+        }
+    }
+}
+
+// MARK: - notifications
+
+enum Notifier {
+    /// The text still landed — this only explains why it wasn't polished.
+    static func aiPassFailed(_ reason: String) {
+        let content = UNMutableNotificationContent()
+        content.title = "Pasted without the AI pass"
+        content.body = reason
+        let request = UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil)
+
+        let centre = UNUserNotificationCenter.current()
+        centre.requestAuthorization(options: [.alert]) { granted, _ in
+            guard granted else { return }
+            centre.add(request)
         }
     }
 }

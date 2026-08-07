@@ -157,7 +157,8 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
             let host = NSHostingView(rootView: SettingsView()
                 .environmentObject(engine)
-                .environmentObject(updater))
+                .environmentObject(updater)
+                .environmentObject(AIPass.shared))
             let size = NSSize(width: 400, height: 620)
             host.autoresizingMask = [.width, .height]
             host.frame = NSRect(origin: .zero, size: size)
