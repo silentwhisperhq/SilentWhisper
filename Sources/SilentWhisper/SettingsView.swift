@@ -113,9 +113,6 @@ struct SettingsView: View {
                     Text(detail)
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                    Text("You can talk while this finishes — the recording is held and transcribed as soon as the model is up.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
                 }
             }
 
@@ -207,13 +204,7 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundStyle(.green)
                         .transition(.opacity)
-                } else {
-                    Text("Checks for updates automatically every few hours.")
-                        .font(.caption)
-                        .foregroundStyle(.secondary)
-                }
-
-                if Updater.isDevBuild {
+                } else if Updater.isDevBuild {
                     HStack(spacing: 6) {
                         Text("BETA")
                             .font(.system(size: 9, weight: .bold))
@@ -229,8 +220,9 @@ struct SettingsView: View {
         }
         .formStyle(.grouped)
         .scrollContentBackground(.hidden)   // let the window's blur show through
-        .frame(width: 400)
-        .fixedSize(horizontal: false, vertical: true)
+        // Capped rather than sized-to-fit: the form has outgrown any screen it would have to
+        // sit on, so the overflow scrolls instead of stretching the window.
+        .frame(width: 400, height: 620)
         .onAppear { onDisk = downloadedModels }
         .onChange(of: engine.model) { onDisk = downloadedModels }
         .onReceive(Timer.publish(every: 2, on: .main, in: .common).autoconnect()) {

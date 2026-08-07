@@ -45,7 +45,7 @@ enum ModelStatus: Equatable {
         switch self {
         case .downloading: "Nothing else is downloaded yet, so this one has to finish first."
         case .warming: "One-time per model, and it can take a few minutes. Cached from then on."
-        case .substituting: "Dictation works now on the model you already have; it swaps over when the download finishes."
+        case .substituting: "Dictation works now; it swaps over when the download finishes."
         default: nil
         }
     }

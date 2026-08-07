@@ -158,13 +158,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
             let host = NSHostingView(rootView: SettingsView()
                 .environmentObject(engine)
                 .environmentObject(updater))
+            let size = NSSize(width: 400, height: 620)
             host.autoresizingMask = [.width, .height]
-            host.frame = NSRect(origin: .zero, size: host.fittingSize)
+            host.frame = NSRect(origin: .zero, size: size)
             glass.frame = host.frame
             glass.addSubview(host)
 
             window.contentView = glass
-            window.setContentSize(host.fittingSize)
+            window.setContentSize(size)
             window.center()
             settingsWindow = window
         }
