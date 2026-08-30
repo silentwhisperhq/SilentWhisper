@@ -1,0 +1,237 @@
+/* Silent Whisper. Plain, single-screen. Near-black, one mark, one line, two buttons.
+   The mark is the app's own blob, rebuilt from the same geometry the Swift draws:
+   a core plus six satellites, blurred and alpha-thresholded so they melt together. */
+
+@font-face{ font-family:"Geist"; src:url("../fonts/Geist-Variable.woff2") format("woff2-variations");
+  font-weight:100 900; font-display:swap; }
+@font-face{ font-family:"Geist Mono"; src:url("../fonts/GeistMono-Variable.woff2") format("woff2-variations");
+  font-weight:100 900; font-display:swap; }
+
+:root{
+  --bg:#0c0c0e;
+  --fg:#ededee;
+  --muted:#86888c;
+  --faint:#5a5c60;
+  --line:rgba(255,255,255,.12);
+  --line-2:rgba(255,255,255,.22);
+  --accent:#00d8ff;
+  --accent-2:#6a5cff;
+  --mono:"Geist Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+  --sans:"Geist", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
+}
+
+*{ box-sizing:border-box; }
+html{ -webkit-font-smoothing:antialiased; text-rendering:optimizeLegibility; }
+body{
+  margin:0; background:var(--bg); color:var(--fg);
+  font-family:var(--sans); font-size:16px; line-height:1.6;
+}
+a{ color:inherit; text-decoration:none; }
+a:hover{ color:var(--accent); }
+
+/* ───────────────── Home (single screen) ───────────────── */
+.home{ display:flex; flex-direction:column; min-height:100dvh; }
+.hero{
+  flex:1; display:flex; flex-direction:column; align-items:center; justify-content:center;
+  text-align:center; gap:26px; padding:64px 24px;
+}
+
+/* Mono, uppercase, widely tracked: the same voice the app uses for its own state
+   labels. Each letter carries the seam gradient and lights up under the cursor. */
+.wordmark{
+  font-family:var(--mono); font-weight:500;
+  font-size:clamp(19px, 3.1vw, 34px); letter-spacing:.30em; text-indent:.30em;
+  margin:0; line-height:1; white-space:nowrap; cursor:default;
+  display:flex; justify-content:center;
+}
+.wordmark span{
+  color:#f2f3f5;
+  transition:color .2s ease, text-shadow .2s ease, transform .2s cubic-bezier(.2,.9,.3,1);
+}
+.wordmark span.sp{ width:.62em; }
+.wordmark span:hover{
+  color:var(--accent); text-shadow:0 0 22px rgba(0,216,255,.55); transform:translateY(-2px);
+}
+.lede{
+  max-width:48ch; margin:0; color:var(--muted);
+  font-size:clamp(14.5px,1.9vw,16.5px); line-height:1.62; letter-spacing:-.006em;
+}
+.lede a{ color:var(--fg); border-bottom:1px solid var(--line-2); }
+.lede a:hover{ color:var(--accent); border-color:var(--accent); }
+.kbd{
+  font-family:var(--mono); font-size:.85em; color:var(--fg);
+  background:#17181b; border:1px solid var(--line-2); border-bottom-width:2px;
+  border-radius:6px; padding:1px 6px;
+}
+
+.actions{ display:flex; gap:12px; flex-wrap:wrap; justify-content:center; margin-top:6px; }
+.btn{
+  font-family:var(--mono); font-size:13.5px; letter-spacing:.01em;
+  color:var(--fg); padding:11px 20px; border:1px solid var(--line-2); border-radius:9px;
+  transition:border-color .18s ease, color .18s ease, background .18s ease;
+}
+.btn:hover{ border-color:var(--accent); color:var(--accent); background:rgba(0,216,255,.05); }
+
+/* The state palette, shown rather than hidden behind a click. The active one lights up
+   as the blob cycles; clicking a swatch jumps the blob straight to that state. */
+.states{ display:flex; gap:10px; flex-wrap:wrap; justify-content:center; margin-top:2px; }
+.swatch{
+  display:flex; align-items:center; gap:8px; cursor:pointer;
+  font-family:var(--mono); font-size:11.5px; letter-spacing:.04em;
+  color:var(--faint); padding:7px 13px 7px 10px; border-radius:999px;
+  border:1px solid transparent; background:none;
+  transition:color .25s ease, border-color .25s ease, background .25s ease;
+}
+.swatch i{ width:26px; height:3px; border-radius:9px; display:block; opacity:.45; transition:opacity .25s ease, box-shadow .25s ease; }
+.swatch:hover{ color:var(--muted); }
+.swatch[aria-current="true"]{ color:var(--fg); border-color:var(--line); background:rgba(255,255,255,.035); }
+.swatch[aria-current="true"] i{ opacity:1; box-shadow:0 0 14px currentColor; }
+.swatch.rec   i{ background:linear-gradient(90deg,#00d8ff,#6a5cff); color:#00d8ff; }
+.swatch.think i{ background:linear-gradient(90deg,#ffb03a,#ff4fa3); color:#ffb03a; }
+.swatch.ai    i{ background:linear-gradient(90deg,#a06bff,#54e0ff); color:#a06bff; }
+.swatch.done  i{ background:linear-gradient(90deg,#3ce87a,#9fffc4); color:#3ce87a; }
+
+.foot{
+  display:flex; justify-content:space-between; gap:16px; flex-wrap:wrap;
+  padding:20px 28px; font-family:var(--mono); font-size:12px; color:var(--faint);
+  border-top:1px solid var(--line);
+}
+.foot a:hover{ color:var(--accent); }
+
+/* ───────────────── The mark (the app's blob, same algorithm) ───────────────── */
+.mark{
+  width:min(680px, 94vw); height:min(400px, 56vw); position:relative; cursor:pointer;
+  display:grid; place-items:center; --amp:0;
+  /* the halo already glows; a drop-shadow would double it */
+}
+/* the rig is authored at 220x120 like the app's panel, then scaled up as one piece */
+.rig{ position:relative; width:220px; height:120px;
+  transform:scale(clamp(1.5, 2.6vw + 0.9, 3.1)); }
+.layer{ position:absolute; inset:0; }
+.layer b{
+  position:absolute; left:50%; top:50%; display:block; border-radius:50%;
+  transition:width .5s cubic-bezier(.2,.9,.3,1), height .5s cubic-bezier(.2,.9,.3,1),
+             margin .5s cubic-bezier(.2,.9,.3,1);
+}
+
+/* state language, lifted from PillState in the Swift */
+[data-state=idle]  { --c1:#8a93a5; --c2:#5c6474; --lift:.26; --spd:1;   }
+[data-state=rec]   { --c1:#00d8ff; --c2:#6a5cff; --lift:1;   --spd:1;   }
+[data-state=think] { --c1:#ffb03a; --c2:#ff4fa3; --lift:.9;  --spd:.34; }
+[data-state=ai]    { --c1:#a06bff; --c2:#54e0ff; --lift:.95; --spd:.34; }
+[data-state=done]  { --c1:#3ce87a; --c2:#9fffc4; --lift:.75; --spd:1.6; }
+
+.aura{
+  filter:blur(15px); opacity:calc(var(--lift) * (.55 + .45 * var(--amp)));
+  transform:scale(calc(1.14 + .14 * var(--amp)));
+}
+.aura b{ background:var(--c1); }
+.aura b:nth-child(even){ background:var(--c2); }
+
+/* the goo: blur + alpha threshold, so neighbours melt instead of overlapping */
+.body{ filter:url(#goo); }
+.body b{ background:radial-gradient(circle at 34% 26%, #23262f, #05060a 72%); }
+
+.m{ width:20px; height:20px; margin:-10px 0 0 -10px; transform:scale(calc(.92 + .3 * var(--amp))); }
+[data-state=rec]   .m, [data-state=rec]   .shine{ width:44px; height:44px; margin:-22px 0 0 -22px; }
+[data-state=think] .m, [data-state=think] .shine{ width:36px; height:36px; margin:-18px 0 0 -18px; }
+[data-state=ai]    .m, [data-state=ai]    .shine{ width:34px; height:34px; margin:-17px 0 0 -17px; }
+[data-state=done]  .m, [data-state=done]  .shine{ width:30px; height:30px; margin:-15px 0 0 -15px; }
+
+/* gloss and seam stay outside the goo so they keep crisp edges */
+.shine{
+  position:absolute; left:50%; top:50%; pointer-events:none;
+  width:20px; height:20px; margin:-10px 0 0 -10px; border-radius:50%;
+  transform:scale(calc(.92 + .3 * var(--amp)));
+  transition:width .5s cubic-bezier(.2,.9,.3,1), height .5s cubic-bezier(.2,.9,.3,1),
+             margin .5s cubic-bezier(.2,.9,.3,1);
+}
+.shine::before{
+  content:""; position:absolute; left:6%; right:6%; top:50%; height:3px;
+  transform:translateY(-50%) scaleX(calc(.55 + .5 * var(--amp)));
+  border-radius:999px; filter:blur(2.2px);
+  opacity:calc(var(--lift) * (.6 + .4 * var(--amp)));
+  background:linear-gradient(90deg, transparent, var(--c1) 20%, #fff 50%, var(--c2) 80%, transparent);
+  box-shadow:0 0 18px color-mix(in srgb, var(--c1) 80%, transparent);
+}
+.shine::after{
+  content:""; position:absolute; inset:8% 18% 58%; border-radius:50%;
+  background:linear-gradient(180deg, rgba(255,255,255,.19), transparent);
+}
+
+.s{ width:0; height:0; margin:0; }
+[data-state=rec] .s, [data-state=think] .s, [data-state=ai] .s, [data-state=done] .s{ width:14px; height:14px; }
+/* resting offsets and periods, one per satellite, matching the Swift table */
+.s1{ margin:-22px 0 0 -40px; animation:swarm calc(2.4s * var(--spd)) ease-in-out infinite; }
+.s2{ margin:8px 0 0 -33px;   animation:swarm calc(3.1s * var(--spd)) ease-in-out infinite .3s; }
+.s3{ margin:-27px 0 0 9px;   animation:swarm calc(2.7s * var(--spd)) ease-in-out infinite .6s; }
+.s4{ margin:10px 0 0 22px;   animation:swarm calc(3.6s * var(--spd)) ease-in-out infinite .9s; }
+.s5{ margin:-9px 0 0 38px;   animation:swarm calc(2.9s * var(--spd)) ease-in-out infinite 1.2s; }
+.s6{ margin:2px 0 0 -52px;   animation:swarm calc(3.3s * var(--spd)) ease-in-out infinite 1.5s; }
+@keyframes swarm{
+  0%,100%{ transform:scale(calc(.35 + .5 * var(--amp))) translate(0,0); }
+  50%    { transform:scale(calc(.8 + .85 * var(--amp))) translate(-7px,5px); }
+}
+
+/* ───────────────── Docs ───────────────── */
+.wrap{ max-width:980px; margin:0 auto; padding:0 28px; }
+
+.nav{ border-bottom:1px solid var(--line); position:sticky; top:0; background:rgba(12,12,14,.86); backdrop-filter:saturate(140%) blur(8px); z-index:5; }
+.nav .wrap{ display:flex; align-items:center; gap:18px; height:58px; }
+.brand{ display:flex; align-items:center; gap:11px; font-size:17px; font-weight:600; letter-spacing:-.02em; color:#fafafa; }
+.brand .dot{ width:20px; height:20px; border-radius:50%; position:relative; flex:none;
+  background:radial-gradient(circle at 34% 26%, #23262f, #05060a 72%); }
+.brand .dot::after{ content:""; position:absolute; left:8%; right:8%; top:50%; height:2px;
+  transform:translateY(-50%); border-radius:9px; filter:blur(.5px);
+  background:linear-gradient(90deg, transparent, var(--accent), #fff, var(--accent-2), transparent); }
+.nav .spacer{ flex:1; }
+.nav .lnk{ font-family:var(--mono); font-size:13px; color:var(--muted); }
+.nav .lnk:hover{ color:var(--accent); }
+.nav .ghbtn{ font-family:var(--mono); font-size:12.5px; color:var(--fg); border:1px solid var(--line-2); padding:7px 13px; border-radius:8px; }
+.nav .ghbtn:hover{ border-color:var(--accent); color:var(--accent); }
+
+.docs{ display:grid; grid-template-columns:200px 1fr; gap:48px; padding:56px 0 96px; align-items:start; }
+.toc{ position:sticky; top:90px; font-family:var(--mono); font-size:12.5px; display:flex; flex-direction:column; gap:6px; }
+.toc a{ color:var(--muted); padding:3px 0; }
+.toc a:hover, .toc a.on{ color:var(--accent); }
+.toc .grp-t{ color:var(--faint); text-transform:uppercase; letter-spacing:.08em; font-size:10.5px; margin-top:16px; }
+.toc .grp-t:first-child{ margin-top:0; }
+
+.doc{ min-width:0; }
+.doc h1{ font-weight:600; letter-spacing:-.035em; font-size:clamp(40px,7vw,60px); margin:0 0 8px; }
+.doc .sub{ color:var(--muted); max-width:62ch; margin:0 0 40px; }
+.doc section{ margin-bottom:56px; scroll-margin-top:84px; }
+.doc h2{ font-size:15px; font-family:var(--mono); font-weight:500; text-transform:uppercase; letter-spacing:.08em; color:var(--accent); border-bottom:1px solid var(--line); padding-bottom:10px; margin:0 0 18px; }
+.doc h3{ font-size:15.5px; font-weight:600; margin:28px 0 8px; }
+.doc p{ color:#c9cacc; max-width:68ch; }
+.doc p a{ color:var(--fg); border-bottom:1px solid var(--line-2); }
+.doc p a:hover{ color:var(--accent); border-color:var(--accent); }
+.doc ul{ color:#c9cacc; max-width:68ch; padding-left:20px; }
+.doc li{ margin:7px 0; }
+
+.tbl{ width:100%; border-collapse:collapse; font-family:var(--mono); font-size:13px; }
+.tbl th{ text-align:left; color:var(--faint); font-weight:400; text-transform:uppercase; letter-spacing:.06em; font-size:10.5px; padding:0 16px 10px 0; border-bottom:1px solid var(--line); }
+.tbl td{ padding:11px 16px 11px 0; border-bottom:1px solid var(--line); vertical-align:top; }
+.tbl td.k{ color:var(--accent); overflow-wrap:break-word; }
+.tbl td.def{ color:var(--muted); white-space:nowrap; }
+.tbl td.desc{ color:#c1c2c4; font-family:var(--sans); font-size:13.5px; }
+
+code{ font-family:var(--mono); font-size:.88em; color:#dfe0e2; background:rgba(255,255,255,.05); padding:.12em .4em; border-radius:4px; }
+pre{ font-family:var(--mono); font-size:13px; line-height:1.7; color:#d6d7d9; background:#111114; border:1px solid var(--line); border-radius:10px; padding:18px 20px; white-space:pre-wrap; overflow-wrap:break-word; }
+pre .c{ color:var(--faint); }
+pre .a{ color:var(--accent); }
+
+kbd{ font-family:var(--mono); font-size:12px; color:var(--fg); background:#17181b; border:1px solid var(--line-2); border-bottom-width:2px; border-radius:6px; padding:2px 7px; }
+.keys{ display:flex; flex-direction:column; gap:0; }
+.keys .row{ display:flex; gap:16px; align-items:baseline; padding:11px 0; border-bottom:1px solid var(--line); }
+.keys .ks{ min-width:150px; display:flex; gap:5px; flex-wrap:wrap; }
+.keys .kd{ color:#c1c2c4; font-size:14px; }
+
+@media (max-width:760px){
+  .docs{ grid-template-columns:1fr; gap:0; }
+  .toc{ display:none; }
+}
+@media (prefers-reduced-motion:reduce){
+  *{ transition:none !important; }
+  .s1,.s2,.s3,.s4,.s5,.s6{ animation:none; }
+}

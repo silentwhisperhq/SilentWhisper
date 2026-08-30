@@ -1,5 +1,6 @@
 import AVFoundation
 import AppKit
+import CoreAudio
 import SwiftUI
 import UserNotifications
 import WhisperKit
@@ -97,7 +98,7 @@ final class Engine: ObservableObject {
     private var whisper: WhisperKit?
     private var activeModel: String?        // the model `whisper` was built from
     private var modelTask: Task<Void, Never>?
-    private let engine = AVAudioEngine()
+    private var engine = AVAudioEngine()
     private let mic = Mic()
     private var levelTimer: Timer?
     private var idleTimer: Timer?
@@ -120,10 +121,24 @@ final class Engine: ObservableObject {
         }
     }
 
-    /// nil means "let Whisper detect it".
+    /// The languages you speak, as Whisper codes. The whole language setting is this one set:
+    /// empty detects across all 99, one is pinned outright, several restrict detection to them.
+    static var spokenLanguages: [String] {
+        let defaults = UserDefaults.standard
+        // Carry over the single-value `language` pref from before this was a set. Written back
+        // once so the old key stops mattering.
+        if defaults.string(forKey: "spokenLanguages") == nil {
+            let old = defaults.string(forKey: "language") ?? "auto"
+            defaults.set(old == "auto" ? "" : old, forKey: "spokenLanguages")
+        }
+        return (defaults.string(forKey: "spokenLanguages") ?? "")
+            .split(separator: ",").map(String.init).filter { !$0.isEmpty }
+    }
+
+    /// nil means "let Whisper detect it" — either across everything, or among a shortlist.
     static var language: String? {
-        let code = UserDefaults.standard.string(forKey: "language") ?? "auto"
-        return code == "auto" ? nil : code
+        let spoken = spokenLanguages
+        return spoken.count == 1 ? spoken[0] : nil
     }
 
     init() {
@@ -134,8 +149,17 @@ final class Engine: ObservableObject {
         modelTask = Task { await loadModel() }
     }
 
+    /// `--demo` drives the blob from a synthetic level so it can be shown, filmed, or
+    /// screenshotted without anyone having to talk into it.
+    static let demo = CommandLine.arguments.contains("--demo")
+
+    func startDemo() { state = .recording }
+
     private func tick() {
-        let raw = mic.level
+        let now = Date().timeIntervalSinceReferenceDate
+        let raw = Engine.demo
+            ? max(0, 0.45 + 0.4 * sin(now * 3.1) + 0.28 * sin(now * 7.7 + 1))
+            : mic.level
         var target: Double
         switch state {
         case .recording: target = raw
@@ -285,9 +309,34 @@ final class Engine: ObservableObject {
         }
     }
 
+    /// Points the engine at the chosen mic, or at whatever CoreAudio currently calls the
+    /// default when none is chosen or the chosen one is gone.
+    ///
+    /// A fresh engine is not enough on its own: when macOS switches the default in the
+    /// background — a device waking, sleeping, or being unplugged — AVAudioEngine can still
+    /// hand back the previous one. Asking the HAL directly and setting the device on the
+    /// input unit is the only answer that survives that.
+    private func pinInput(_ input: AVAudioInputNode) {
+        let wanted = UserDefaults.standard.string(forKey: "inputDevice") ?? ""
+        // A disconnected mic falls back to the system default rather than failing: the
+        // preference is a preference, not a requirement.
+        guard let device = AudioDevices.id(forUID: wanted) ?? AudioDevices.systemDefault(),
+              let unit = input.audioUnit
+        else { return }
+        var id = device
+        AudioUnitSetProperty(unit, kAudioOutputUnitProperty_CurrentDevice,
+                             kAudioUnitScope_Global, 0, &id,
+                             UInt32(MemoryLayout<AudioDeviceID>.size))
+    }
+
     private func beginTap() {
         guard state != .recording, state != .transcribing else { return }
+        // A realized inputNode keeps the device it bound to, so a long-lived engine goes on
+        // recording from whichever mic was default at launch. Building a fresh one per press
+        // resolves the current default instead — cheap, since nothing opens until start().
+        engine = AVAudioEngine()
         let input = engine.inputNode
+        pinInput(input)
         let inFormat = input.inputFormat(forBus: 0)
         guard inFormat.sampleRate > 0,
               let outFormat = AVAudioFormat(commonFormat: .pcmFormatFloat32,
@@ -334,7 +383,17 @@ final class Engine: ObservableObject {
             return
         }
         do {
-            let language = Engine.language
+            // One language is pinned outright. Several keeps detection inside them: Whisper hands
+            // back a probability for every language, so the pick is the best *candidate* rather
+            // than the best overall — which is what stops Turkish landing on some language you
+            // have never spoken.
+            // ponytail: costs one extra encoder pass; drop it if push-to-talk latency suffers.
+            var language = Engine.language
+            let spoken = Engine.spokenLanguages
+            if language == nil, spoken.count > 1,
+               let probs = try? await whisper.detectLangauge(audioArray: audio).langProbs {
+                language = spoken.max { (probs[$0] ?? -.infinity) < (probs[$1] ?? -.infinity) }
+            }
             // Seeding the decoder with your own names and jargon fixes them at the source,
             // before the AI pass ever has to guess at them.
             let vocab = AIPass.vocabulary.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -343,7 +402,10 @@ final class Engine: ObservableObject {
             let results = try await whisper.transcribe(audioArray: audio, decodeOptions: DecodingOptions(
                 task: .transcribe,
                 language: language,
-                usePrefillPrompt: prompt != nil,
+                // Always on: this is what forces <|transcribe|> and the language token into the
+                // decoder. Off, the model picks its own task and large-v3-turbo often chooses
+                // translate — Turkish in, fluent English out. It also gates detectLanguage.
+                usePrefillPrompt: true,
                 detectLanguage: language == nil,
                 skipSpecialTokens: true,
                 withoutTimestamps: true,

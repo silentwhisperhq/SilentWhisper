@@ -35,12 +35,23 @@ window and follows you across Spaces and full-screen apps.
 
 ### Languages
 
-Defaults to the multilingual `small` model with automatic language detection, so Turkish,
-German, Japanese and the rest work out of the box. The `.en` models are English-only and
-will return nonsense for anything else — pick a model without the `.en` suffix.
+Language is a list of checkboxes, and the number you tick is the setting. None means Whisper
+detects from all 99, which is where a stray language comes from on short takes. One pins it —
+no detection runs, so it cannot land anywhere else. Several keep detection inside the languages
+you actually speak. Ticking the two or three you use is usually the right answer.
 
-Bigger models are more accurate and slower. `small` is the smallest one that handles
-non-English properly.
+A take is one language either way: Whisper labels each 30-second window once, so half Turkish
+and half French in a single recording does not work.
+
+The `.en` models are English-only and will return confident nonsense for anything else — pick a
+model without the `.en` suffix. Bigger models are more accurate and slower; `small` is the
+smallest one that handles non-English properly.
+
+### Microphone
+
+Follows the system input and re-reads it on every take, so switching devices needs no restart.
+Pick a specific mic in Settings to ignore the system default — if it is unplugged or asleep,
+the app falls back to the system input rather than failing.
 
 ## Build from source
 

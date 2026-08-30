@@ -50,7 +50,8 @@ struct SettingsView: View {
     @EnvironmentObject var engine: Engine
     @EnvironmentObject var updater: Updater
     @AppStorage("model") private var model = "small"
-    @AppStorage("language") private var language = "auto"
+    @AppStorage("inputDevice") private var inputDevice = ""   // "" follows the system default
+    @AppStorage("spokenLanguages") private var spokenLanguages = ""   // codes, comma separated
     @AppStorage("autoPaste") private var autoPaste = true
     @AppStorage("reducedMotion") private var reducedMotion = "system"
     @AppStorage("aiEnabled") private var aiEnabled = false
@@ -79,13 +80,59 @@ struct SettingsView: View {
     /// Scanning the model cache touches the disk, so it happens on appear and when a
     /// download finishes — never inside `body`, which SwiftUI may run at any rate.
     @State private var onDisk: Set<String> = []
+    @State private var mics: [AudioDevices.Device] = []
+
+    private var spoken: [String] {
+        spokenLanguages.split(separator: ",").map(String.init).filter { !$0.isEmpty }
+    }
+
+    private var spokenSummary: String {
+        let names = spoken.compactMap { code in languages.first { $0.code == code }?.name }
+        return names.isEmpty ? "Detect automatically" : names.joined(separator: ", ")
+    }
+
+    /// The set means three different things by size, so say which one is in force.
+    private var languageHint: String {
+        switch spoken.count {
+        case 0:  "Whisper picks from all 99 languages — that is where a stray one comes from."
+        case 1:  "Pinned. No detection runs, so it can never land on another language."
+        default: "Detection is limited to these. One recording is still one language: Whisper labels each 30-second window once, so switching mid-sentence does not work."
+        }
+    }
 
     var body: some View {
         Form {
             Section {
-                Picker("Language", selection: $language) {
-                    ForEach(languages, id: \.code) { Text($0.name).tag($0.code) }
+                LabeledContent("Language") {
+                    Menu(spokenSummary) {
+                        ForEach(languages.dropFirst(), id: \.code) { lang in
+                            Toggle(lang.name, isOn: Binding(
+                                get: { spoken.contains(lang.code) },
+                                set: { on in
+                                    var codes = spoken
+                                    if on { codes.append(lang.code) }
+                                    else { codes.removeAll { $0 == lang.code } }
+                                    spokenLanguages = codes.joined(separator: ",")
+                                }))
+                        }
+                        if !spoken.isEmpty {
+                            Divider()
+                            Button("Detect automatically") { spokenLanguages = "" }
+                        }
+                    }
                 }
+
+                Text(languageHint)
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+
+                Picker("Microphone", selection: $inputDevice) {
+                    Text("Follow system setting").tag("")
+                    ForEach(mics) { Text($0.name).tag($0.id) }
+                }
+                // The list is read when the pane appears, not in `body` — CoreAudio should not
+                // be polled at SwiftUI's redraw rate.
+                .onAppear { mics = AudioDevices.inputs() }
 
                 Picker("Model", selection: $model) {
                     ForEach(availableModels, id: \.self) { name in

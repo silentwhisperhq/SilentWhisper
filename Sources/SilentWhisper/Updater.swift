@@ -7,7 +7,7 @@ import Foundation
 /// contract is one public JSON endpoint plus a zip.
 @MainActor
 final class Updater: ObservableObject {
-    static let repo = "notnaki/silent-whisper"
+    static let repo = "silentwhisperhq/SilentWhisper"
 
     enum Status: Equatable {
         case idle

@@ -1,0 +1,222 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Documentation · Silent Whisper</title>
+<meta name="description" content="Install, permissions, models, languages and the optional AI pass.">
+<meta name="theme-color" content="#0c0c0e">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ccircle cx='16' cy='16' r='11' fill='%2312141a'/%3E%3Crect x='6' y='15' width='20' height='2' rx='1' fill='%2300d8ff'/%3E%3C/svg%3E">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+
+<div class="nav">
+  <div class="wrap">
+    <a class="brand" href="index.html"><span class="dot"></span> Silent Whisper</a>
+    <span class="spacer"></span>
+    <a class="lnk" href="https://github.com/silentwhisperhq/SilentWhisper/releases/latest">Install</a>
+    <a class="ghbtn" href="https://github.com/silentwhisperhq/SilentWhisper">GitHub ↗</a>
+  </div>
+</div>
+
+<div class="wrap">
+  <div class="docs">
+    <aside class="toc">
+      <span class="grp-t">Start</span>
+      <a href="#install">Install</a>
+      <a href="#permissions">Permissions</a>
+      <a href="#use">Using it</a>
+      <span class="grp-t">Speech</span>
+      <a href="#microphone">Microphone</a>
+      <a href="#models">Models</a>
+      <a href="#languages">Languages</a>
+      <a href="#vocabulary">Vocabulary</a>
+      <span class="grp-t">Optional</span>
+      <a href="#ai">AI pass</a>
+      <a href="#look">Look and motion</a>
+      <span class="grp-t">Meta</span>
+      <a href="#privacy">Privacy</a>
+      <a href="#updates">Updates</a>
+      <a href="#build">Build from source</a>
+    </aside>
+
+    <main class="doc">
+      <h1>Documentation</h1>
+      <p class="sub">Silent Whisper is a menu bar app. Hold a key, talk, and it types.
+        Everything below is optional except the first two sections.</p>
+
+      <section id="install">
+        <h2>Install</h2>
+        <p>Download the <code>.dmg</code> from the
+          <a href="https://github.com/silentwhisperhq/SilentWhisper/releases/latest">latest release</a> and drag the app to
+          Applications. It is signed with an Apple Developer ID and notarized by Apple, so it opens without a warning.</p>
+        <p>Requires macOS 14 or later on Apple silicon.</p>
+      </section>
+
+      <section id="permissions">
+        <h2>Permissions</h2>
+        <p>macOS asks for two things on first launch. Both are needed.</p>
+        <div class="keys">
+          <div class="row"><span class="ks"><kbd>Microphone</kbd></span><span class="kd">To hear you. Nothing is recorded to disk.</span></div>
+          <div class="row"><span class="ks"><kbd>Accessibility</kbd></span><span class="kd">So the hotkey works in any app, and so the app can press <kbd>⌘V</kbd> for you.</span></div>
+        </div>
+        <p style="margin-top:20px">If the hotkey stops working after an update, remove the old Silent Whisper entry in
+          System Settings under Privacy &amp; Security, then add the app again. Toggling it off and on is not enough.</p>
+      </section>
+
+      <section id="use">
+        <h2>Using it</h2>
+        <div class="keys">
+          <div class="row"><span class="ks"><kbd>Hold right ⌥</kbd></span><span class="kd">Records while held. Release to transcribe and paste.</span></div>
+          <div class="row"><span class="ks"><kbd>Click the blob</kbd></span><span class="kd">Starts a hands free take. It ends itself once you stop talking.</span></div>
+          <div class="row"><span class="ks"><kbd>Click again</kbd></span><span class="kd">Cancels a take that is still transcribing.</span></div>
+        </div>
+        <p style="margin-top:20px">The text is always copied to the clipboard. With <em>Paste automatically</em> on, it is
+          also pasted into whatever had focus.</p>
+        <p>The blob only appears while something is happening. When idle it is not on screen at all, and it costs nothing.</p>
+      </section>
+
+      <section id="microphone">
+        <h2>Microphone</h2>
+        <p>By default Silent Whisper follows the system input, and it re-reads it at the moment you press — switch
+          devices in System Settings and the next take uses the new one, no restart.</p>
+        <p>To ignore the system and always use one mic, pick it under <em>Microphone</em>. If that device is
+          unplugged or asleep the app quietly falls back to the system input rather than failing, and goes back to
+          your choice when it reappears.</p>
+      </section>
+
+      <section id="models">
+        <h2>Models</h2>
+        <p>Speech recognition runs locally through
+          <a href="https://github.com/argmaxinc/WhisperKit">WhisperKit</a> on the Neural Engine. Bigger models are more
+          accurate and slower. The first run of a model downloads it, then compiles it for the Neural Engine, which takes
+          a few minutes once per model.</p>
+        <table class="tbl">
+          <thead><tr><th>Model</th><th>Size</th><th class="desc">Notes</th></tr></thead>
+          <tbody>
+            <tr><td class="k">tiny</td><td class="def">~75 MB</td><td class="desc">Fastest and roughest. Weak outside English.</td></tr>
+            <tr><td class="k">base</td><td class="def">~145 MB</td><td class="desc">Quick, shaky on names and inflected endings.</td></tr>
+            <tr><td class="k">small</td><td class="def">~465 MB</td><td class="desc">The default. Smallest model that handles non-English properly.</td></tr>
+            <tr><td class="k">medium</td><td class="def">~1.5 GB</td><td class="desc">Better again, noticeably slower on long takes.</td></tr>
+            <tr><td class="k">large-v3_turbo</td><td class="def">~1.6 GB</td><td class="desc">Most accurate.</td></tr>
+            <tr><td class="k">base.en, small.en</td><td class="def">varies</td><td class="desc">English only. Returns nonsense for other languages.</td></tr>
+          </tbody>
+        </table>
+        <p style="margin-top:20px">Models already on disk are marked with a check in the picker. If you select one you do
+          not have yet, the best model you already have loads immediately and the new one downloads behind it, so you can
+          keep dictating. You only wait when nothing at all is downloaded.</p>
+      </section>
+
+      <section id="languages">
+        <h2>Languages</h2>
+        <p>Language is one list of checkboxes, and how many you tick decides what happens.</p>
+        <div class="keys">
+          <div class="row"><span class="ks"><kbd>None</kbd></span><span class="kd">Whisper detects from all 99 languages. Short takes are where it guesses wrong.</span></div>
+          <div class="row"><span class="ks"><kbd>One</kbd></span><span class="kd">Pinned. No detection runs at all, so it can never land on another language.</span></div>
+          <div class="row"><span class="ks"><kbd>Several</kbd></span><span class="kd">Detection is limited to the ones you speak. Costs a moment before the text lands.</span></div>
+        </div>
+        <p style="margin-top:20px">Tick the two or three languages you actually use and a stray one stops being possible.
+          A take is still a single language either way: Whisper labels each 30 second window once, so half Türkçe and
+          half Français in one recording does not work — the quieter half gets pushed through the other language.</p>
+        <p>The one trap worth knowing: the models whose names end in <code>.en</code> are English only. They do not fail
+          on other languages, they return confident nonsense. For Türkçe, Deutsch, 日本語 and the rest, use a model
+          without the suffix.</p>
+      </section>
+
+      <section id="vocabulary">
+        <h2>Vocabulary</h2>
+        <p>Names, product names and acronyms that keep coming out wrong go in the vocabulary field, comma separated.
+          These are fed to the Whisper decoder itself as a prompt, not just to the cleanup afterwards, so the fix happens
+          at the source.</p>
+        <pre>Nuh, WhisperKit, Anthropic, Ghostty, libghostty, Vesta</pre>
+      </section>
+
+      <section id="ai">
+        <h2>AI pass</h2>
+        <p>An optional second pass over the transcription that fixes punctuation, casing and misheard words. It is off by
+          default.</p>
+        <p><strong>It can never cost you a dictation.</strong> If the pass fails for any reason, offline, bad key, out of
+          credit, or slower than twelve seconds, the plain transcription is pasted anyway and a notification explains
+          why. Results that look like a reply rather than a repair are rejected the same way.</p>
+        <table class="tbl">
+          <thead><tr><th>Provider</th><th>Key</th><th class="desc">Notes</th></tr></thead>
+          <tbody>
+            <tr><td class="k">Apple</td><td class="def">none</td><td class="desc">On device. Nothing leaves the Mac. Good at English, unreliable on other languages.</td></tr>
+            <tr><td class="k">Anthropic</td><td class="def">required</td><td class="desc">Claude. Strongest for non-English cleanup.</td></tr>
+            <tr><td class="k">OpenAI</td><td class="def">required</td><td class="desc">Any chat completions model.</td></tr>
+            <tr><td class="k">Google</td><td class="def">required</td><td class="desc">Gemini.</td></tr>
+          </tbody>
+        </table>
+        <h3>Styles</h3>
+        <ul>
+          <li><strong>Clean up</strong>, fixes punctuation and removes filler, keeps your wording.</li>
+          <li><strong>Punctuation only</strong>, adds punctuation and nothing else. Every word survives.</li>
+          <li><strong>Professional</strong>, tightens rambling sentences and fixes grammar.</li>
+          <li><strong>Custom</strong>, your own instruction.</li>
+        </ul>
+        <p style="margin-top:20px">API keys are stored in the macOS Keychain, never in preferences. Only the finished
+          text is sent, never audio.</p>
+      </section>
+
+      <section id="look">
+        <h2>Look and motion</h2>
+        <p>Four looks for the blob: Glass, which refracts the desktop behind it, plus Obsidian, Chrome and Pearl.</p>
+        <p>Motion follows the system Reduce Motion setting by default, and can be forced on or off. Reduced motion keeps
+          the blob responsive to your voice but stops the satellites orbiting.</p>
+      </section>
+
+      <section id="privacy">
+        <h2>Privacy</h2>
+        <p>Audio never leaves the Mac. Whisper runs locally, there is no account, no telemetry and no server.</p>
+        <p>The only outbound traffic is the model download on first run, a daily check for updates, and, if you turn it
+          on, the finished text going to the AI provider you chose with a key you own.</p>
+      </section>
+
+      <section id="updates">
+        <h2>Updates</h2>
+        <p>The app checks for updates on launch and every few hours, and can install them in place. There is a Check
+          button in Settings if you want to look now.</p>
+      </section>
+
+      <section id="build">
+        <h2>Build from source</h2>
+        <p>Swift 5.10 or later, and Xcode command line tools.</p>
+        <pre><span class="c"># build SilentWhisper.app</span>
+<span class="a">./build.sh</span>
+
+<span class="c"># regenerate the app icon</span>
+<span class="a">./makeicon.sh</span>
+
+<span class="c"># check the blob geometry and the AI pass guards</span>
+<span class="a">.build/debug/SilentWhisper --selftest</span>
+
+<span class="c"># build, sign, notarize and publish a release</span>
+<span class="a">./release.sh 1.1.1</span></pre>
+        <p style="margin-top:20px">Without an Apple Developer ID the build falls back to ad hoc signing, and macOS then
+          revokes the Accessibility grant on every rebuild. With a certificate in your keychain the build picks it up and
+          the grant sticks. Tagging a version pushes a signed, notarized release through GitHub Actions.</p>
+      </section>
+    </main>
+  </div>
+</div>
+
+<script>
+// Highlight the section currently in view in the table of contents.
+var links = [].slice.call(document.querySelectorAll(".toc a"));
+var seen = new Map();
+new IntersectionObserver(function (entries) {
+  entries.forEach(function (e) { seen.set(e.target.id, e.isIntersecting); });
+  var current = links.find(function (a) { return seen.get(a.getAttribute("href").slice(1)); });
+  links.forEach(function (a) { a.classList.toggle("on", a === current); });
+}, { rootMargin: "-84px 0px -70% 0px" }).observe
+  && document.querySelectorAll(".doc section").forEach(function (s) {
+    new IntersectionObserver(function (entries) {
+      entries.forEach(function (e) { seen.set(e.target.id, e.isIntersecting); });
+      var current = links.find(function (a) { return seen.get(a.getAttribute("href").slice(1)); });
+      links.forEach(function (a) { a.classList.toggle("on", a === current); });
+    }, { rootMargin: "-84px 0px -70% 0px" }).observe(s);
+  });
+</script>
+</body>
+</html>

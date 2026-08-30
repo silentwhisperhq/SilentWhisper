@@ -11,7 +11,31 @@ VERSION=$(cat VERSION)
 # distinguishable from a real download. release.sh sets SW_RELEASE to turn it off.
 DEV_BUILD=$([ -n "${SW_RELEASE:-}" ] && echo false || echo true)
 
-[ -f AppIcon.icns ] || ./makeicon.sh
+# The icon is an Icon Composer document (AppIcon.icon). actool only renders it on macOS 26,
+# so the rendered output is committed under AppIcon-prebuilt/ and preferred when present —
+# CI runs on macos-15, where actool would silently fall back to the flat icns.
+# To refresh after editing AppIcon.icon, on macOS 26:
+#   xcrun actool AppIcon.icon --compile out --app-icon AppIcon --platform macosx \
+#     --minimum-deployment-target 26.0 --output-partial-info-plist out/icon.plist
+#   cp out/Assets.car AppIcon-prebuilt/     # then rebuild AppIcon.icns from the render
+ICONDIR=$(mktemp -d)
+if [ -f AppIcon-prebuilt/AppIcon.icns ]; then
+  cp AppIcon-prebuilt/AppIcon.icns "$ICONDIR/AppIcon.icns"
+  [ -f AppIcon-prebuilt/Assets.car ] && cp AppIcon-prebuilt/Assets.car "$ICONDIR/Assets.car"
+elif [ -d AppIcon.icon ] && xcrun actool AppIcon.icon --compile "$ICONDIR" --app-icon AppIcon \
+     --platform macosx --minimum-deployment-target 26.0 \
+     --output-partial-info-plist "$ICONDIR/icon.plist" >/dev/null 2>&1 \
+     && [ -f "$ICONDIR/AppIcon.icns" ]; then
+  :
+else
+  [ -f AppIcon.icns ] || ./makeicon.sh
+  cp AppIcon.icns "$ICONDIR/AppIcon.icns"
+fi
+
+# Assets.car is what lets macOS 26 draw and shape the icon itself (found via CFBundleIconName).
+# Without it Tahoe adds its own squircle and shadow on top of the already-rounded icns.
+ICON_NAME_KEY=""
+[ -f "$ICONDIR/Assets.car" ] && ICON_NAME_KEY='  <key>CFBundleIconName</key>          <string>AppIcon</string>'
 
 swift build -c "$CONFIG"
 BIN=$(swift build -c "$CONFIG" --show-bin-path)
@@ -19,7 +43,8 @@ BIN=$(swift build -c "$CONFIG" --show-bin-path)
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 cp "$BIN/SilentWhisper" "$APP/Contents/MacOS/"
-cp AppIcon.icns "$APP/Contents/Resources/"
+cp "$ICONDIR/AppIcon.icns" "$APP/Contents/Resources/"
+[ -f "$ICONDIR/Assets.car" ] && cp "$ICONDIR/Assets.car" "$APP/Contents/Resources/"
 
 # WhisperKit ships Metal/CoreML resource bundles next to the binary — they must come along.
 cp -R "$BIN"/*.bundle "$APP/Contents/Resources/" 2>/dev/null || true
@@ -35,6 +60,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
   <key>CFBundleIdentifier</key>        <string>com.nuh.silentwhisper</string>
   <key>CFBundlePackageType</key>       <string>APPL</string>
   <key>CFBundleIconFile</key>          <string>AppIcon</string>
+$ICON_NAME_KEY
   <key>SWDevBuild</key>                <$DEV_BUILD/>
   <key>CFBundleShortVersionString</key><string>$VERSION</string>
   <key>CFBundleVersion</key>           <string>$VERSION</string>

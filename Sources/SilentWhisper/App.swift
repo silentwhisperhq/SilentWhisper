@@ -38,6 +38,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
         // Lets a test instance land straight on the pane that is being measured.
         if CommandLine.arguments.contains("--settings") { openSettings() }
+        // After the state watcher below is subscribed, or the reveal never fires.
+        if Engine.demo {
+            DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) { [weak self] in
+                self?.engine.startDemo()
+            }
+        }
 
         NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.accessibilityDisplayOptionsDidChangeNotification,
