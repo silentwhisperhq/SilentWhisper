@@ -3,3 +3,4 @@ SilentWhisper.app/
 AppIcon.icns
 *.zip
 *.dmg
+.DS_Store
