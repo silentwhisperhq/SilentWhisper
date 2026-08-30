@@ -8,7 +8,11 @@ No account, no network, no subscription. Whisper runs locally through
 
 ## Install
 
-Grab the latest `.zip` from [Releases](https://github.com/notnaki/silent-whisper/releases),
+```sh
+brew install --cask silentwhisperhq/tap/silentwhisper
+```
+
+Or grab the latest `.zip` from [Releases](https://github.com/silentwhisperhq/SilentWhisper/releases),
 unzip, and drag `SilentWhisper.app` to `/Applications`.
 
 macOS will ask for two permissions on first launch:
@@ -54,3 +58,14 @@ revokes its Accessibility permission on every rebuild. If the hotkey stops worki
 rebuild, remove the stale entry in *System Settings → Privacy & Security → Accessibility*
 and add the app again. With a real certificate in your keychain, `build.sh` picks it up
 automatically and the grant sticks.
+
+---
+
+## Licence
+
+MIT — free and open source, for anyone, including commercially. No licence key, no account, no
+analytics. See [LICENSE](LICENSE).
+
+Transcription runs on-device. The network is touched to download a model the first time you pick
+it, to check for updates, and — only if you switch the AI pass on — to reach the provider you
+chose.
