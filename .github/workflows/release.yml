@@ -57,12 +57,12 @@ jobs:
           security find-identity -v -p codesigning "$KEYCHAIN"
 
       - name: Build and sign
-        run: SW_RELEASE=1 ./build.sh release
+        run: SW_RELEASE=1 ./scripts/build.sh release
 
       - name: Package
         run: |
           ditto -c -k --keepParent SilentWhisper.app "SilentWhisper-${{ steps.version.outputs.value }}.zip"
-          ./makedmg.sh
+          ./scripts/makedmg.sh
 
       # Notarize both artifacts: the zip feeds the in-app updater, the DMG is the download.
       - name: Notarize and staple
@@ -79,7 +79,7 @@ jobs:
           # Rebuild both containers so they carry the stapled app.
           rm -f "SilentWhisper-$V.zip"
           ditto -c -k --keepParent SilentWhisper.app "SilentWhisper-$V.zip"
-          ./makedmg.sh
+          ./scripts/makedmg.sh
           xcrun notarytool submit "SilentWhisper-$V.dmg" \
             --apple-id "$APPLE_ID" --team-id "$TEAM_ID" --password "$APP_PASSWORD" --wait
           xcrun stapler staple "SilentWhisper-$V.dmg"

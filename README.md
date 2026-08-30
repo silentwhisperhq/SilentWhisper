@@ -56,9 +56,9 @@ the app falls back to the system input rather than failing.
 ## Build from source
 
 ```sh
-./build.sh          # builds SilentWhisper.app
-./makeicon.sh       # regenerates the icon
-./release.sh 1.0.1  # builds, tags, and publishes a GitHub release
+scripts/build.sh          # builds SilentWhisper.app
+scripts/makeicon.sh       # regenerates the icon
+scripts/release.sh 1.0.1  # builds, tags, and publishes a GitHub release
 .build/debug/SilentWhisper --selftest   # checks the blob animation maths
 ```
 

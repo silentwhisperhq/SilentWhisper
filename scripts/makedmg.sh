@@ -1,7 +1,7 @@
 #!/bin/bash
 # Packages SilentWhisper.app into a drag-to-Applications DMG.
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 VERSION=$(cat VERSION)
 DMG="SilentWhisper-$VERSION.dmg"

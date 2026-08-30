@@ -1,7 +1,7 @@
 #!/bin/bash
-# Builds SilentWhisper.app. Run ./build.sh, then open SilentWhisper.app.
+# Builds SilentWhisper.app. Run scripts/build.sh, then open SilentWhisper.app.
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
 CONFIG=${1:-release}
 APP="SilentWhisper.app"
@@ -28,7 +28,7 @@ elif [ -d AppIcon.icon ] && xcrun actool AppIcon.icon --compile "$ICONDIR" --app
      && [ -f "$ICONDIR/AppIcon.icns" ]; then
   :
 else
-  [ -f AppIcon.icns ] || ./makeicon.sh
+  [ -f AppIcon.icns ] || scripts/makeicon.sh
   cp AppIcon.icns "$ICONDIR/AppIcon.icns"
 fi
 

@@ -1,12 +1,12 @@
 #!/bin/bash
 # Cuts a GitHub release the in-app updater can find: ./release.sh 1.0.1
 set -euo pipefail
-cd "$(dirname "$0")"
+cd "$(dirname "$0")/.."
 
-VERSION=${1:?usage: ./release.sh <version>}
+VERSION=${1:?usage: scripts/release.sh <version>}
 echo "$VERSION" > VERSION
 
-SW_RELEASE=1 ./build.sh release
+SW_RELEASE=1 scripts/build.sh release
 
 ZIP="SilentWhisper-$VERSION.zip"
 rm -f "$ZIP"
@@ -29,7 +29,7 @@ if xcrun notarytool history --keychain-profile silentwhisper >/dev/null 2>&1; th
 fi
 
 # The DMG is the human download; the zip stays for the in-app updater.
-./makedmg.sh
+scripts/makedmg.sh
 DMG="SilentWhisper-$VERSION.dmg"
 if [ "$NOTARIZED" = yes ]; then
   xcrun notarytool submit "$DMG" --keychain-profile silentwhisper --wait

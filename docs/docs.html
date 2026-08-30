@@ -183,16 +183,16 @@
         <h2>Build from source</h2>
         <p>Swift 5.10 or later, and Xcode command line tools.</p>
         <pre><span class="c"># build SilentWhisper.app</span>
-<span class="a">./build.sh</span>
+<span class="a">scripts/build.sh</span>
 
 <span class="c"># regenerate the app icon</span>
-<span class="a">./makeicon.sh</span>
+<span class="a">scripts/makeicon.sh</span>
 
 <span class="c"># check the blob geometry and the AI pass guards</span>
 <span class="a">.build/debug/SilentWhisper --selftest</span>
 
 <span class="c"># build, sign, notarize and publish a release</span>
-<span class="a">./release.sh 1.1.1</span></pre>
+<span class="a">scripts/release.sh 1.1.1</span></pre>
         <p style="margin-top:20px">Without an Apple Developer ID the build falls back to ad hoc signing, and macOS then
           revokes the Accessibility grant on every rebuild. With a certificate in your keychain the build picks it up and
           the grant sticks. Tagging a version pushes a signed, notarized release through GitHub Actions.</p>
