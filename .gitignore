@@ -1,6 +1,6 @@
 .build/
 SilentWhisper.app/
-AppIcon.icns
+/AppIcon.icns
 *.zip
 *.dmg
 .DS_Store
